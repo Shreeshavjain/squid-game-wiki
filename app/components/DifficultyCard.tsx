@@ -24,6 +24,7 @@ const TIER_ACCENTS = {
     badgeBg: 'bg-blue-950/20',
     iconActiveColor: 'text-blue-300',
     glowColor: 'rgba(59,130,246,0.28)',
+    borderDefault: 'border-blue-400/15',
     borderActive: 'border-blue-500/50 shadow-[0_0_28px_rgba(59,130,246,0.18)]',
   },
   medium: {
@@ -34,6 +35,7 @@ const TIER_ACCENTS = {
     badgeBg: 'bg-amber-950/20',
     iconActiveColor: 'text-amber-300',
     glowColor: 'rgba(245,158,11,0.28)',
+    borderDefault: 'border-amber-400/15',
     borderActive: 'border-amber-500/50 shadow-[0_0_28px_rgba(245,158,11,0.14)]',
   },
   hard: {
@@ -44,6 +46,7 @@ const TIER_ACCENTS = {
     badgeBg: 'bg-rose-950/20',
     iconActiveColor: 'text-rose-400',
     glowColor: 'rgba(225,29,72,0.35)',
+    borderDefault: 'border-rose-500/20',
     borderActive:
       'border-rose-500/70 shadow-[0_0_32px_rgba(225,29,72,0.28)] ring-1 ring-rose-500/30',
   },
@@ -88,7 +91,7 @@ export function DifficultyCard({
     ? 'border-rose-500 shadow-[0_0_40px_rgba(225,29,72,0.38)] ring-1 ring-rose-500/50'
     : isLocked
     ? 'border-zinc-800/30 opacity-45 grayscale'
-    : `border-zinc-800/70 hover:${accents.borderActive}`;
+    : `${accents.borderDefault} hover:${accents.borderActive}`;
 
   return (
     <article
@@ -104,12 +107,17 @@ export function DifficultyCard({
       className={[
         // Layout: flex-col for natural height growth
         'relative flex flex-col rounded-xl',
-        'bg-gradient-to-b from-zinc-900/90 via-zinc-950/95 to-[#09090d]',
         'border p-6 sm:p-7',
         // Transition border & shadow
         'transition-[border-color,box-shadow,opacity,filter] duration-300',
         borderClass,
       ].join(' ')}
+      style={{
+        /* Smoked glass: translucent charcoal with backdrop blur */
+        backgroundColor: 'rgba(12, 12, 16, 0.65)',
+        backdropFilter: 'blur(16px) saturate(1.2)',
+        WebkitBackdropFilter: 'blur(16px) saturate(1.2)',
+      }}
       aria-label={`${tier.title} difficulty card`}
     >
       {/* ── Thin top accent bar (colour-coded per tier) ── */}
@@ -149,7 +157,7 @@ export function DifficultyCard({
 
           <div
             className={[
-              'w-[72px] h-[72px] rounded-full border bg-zinc-900/70 flex items-center justify-center',
+              'w-[72px] h-[72px] rounded-full border bg-zinc-900/40 flex items-center justify-center',
               'transition-[border-color,transform] duration-300',
               `border-zinc-800 hover:border-zinc-600 hover:scale-105`,
             ].join(' ')}
@@ -176,13 +184,13 @@ export function DifficultyCard({
           <div className="font-mono text-[11px] text-rose-500/80 tracking-wider uppercase mt-1 leading-snug">
             {tier.subtitle}
           </div>
-          <div className="mt-2 text-[11px] font-mono text-zinc-400 tracking-wide bg-zinc-900/60 border border-zinc-800/80 px-2.5 py-1.5 rounded inline-block">
+          <div className="mt-2 text-[11px] font-mono text-zinc-300 tracking-wide bg-zinc-900/30 border border-zinc-800/40 px-2.5 py-1.5 rounded inline-block">
             {tier.riskDescriptor}
           </div>
         </div>
 
         {/* ── Stats grid (ALWAYS VISIBLE – no interaction required) ── */}
-        <div className="grid grid-cols-3 divide-x divide-zinc-800/80 bg-zinc-950/80 rounded-lg border border-zinc-800/80 text-center mb-4 overflow-hidden">
+        <div className="grid grid-cols-3 divide-x divide-zinc-700/20 bg-zinc-950/40 rounded-lg border border-zinc-700/20 text-center mb-4 overflow-hidden">
           <div className="px-2 py-2.5">
             <div className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">TIME</div>
             <div className="font-mono text-[11px] font-bold text-zinc-200 mt-0.5">{tier.timeLimit}</div>
@@ -252,7 +260,7 @@ export function DifficultyCard({
           >
             <div className="overflow-hidden space-y-2.5">
               {/* Rules list */}
-              <div className="space-y-2 bg-zinc-950/70 p-3 rounded border border-zinc-800/80">
+              <div className="space-y-2 bg-zinc-950/30 p-3 rounded border border-zinc-700/20">
                 {tier.rules.map((rule, idx) => (
                   <div key={rule.id}>
                     <div className="flex items-baseline gap-1.5 font-mono text-[11px] text-zinc-200 font-semibold">
@@ -309,7 +317,7 @@ export function DifficultyCard({
             aria-label={`Select ${tier.title} difficulty — opens confirmation dialog`}
             className={[
               'w-full py-3 px-4 rounded font-mono text-xs uppercase tracking-widest font-bold cursor-pointer',
-              'text-zinc-200 bg-zinc-900 border border-zinc-700',
+              'text-zinc-100 bg-zinc-900/50 border border-zinc-600/30 shadow-sm',
               'hover:bg-rose-600 hover:text-white hover:border-rose-500 hover:shadow-[0_0_22px_rgba(225,29,72,0.42)]',
               'transition-all duration-200',
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 focus-visible:ring-offset-black',

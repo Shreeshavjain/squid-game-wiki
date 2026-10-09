@@ -11,13 +11,29 @@ interface HeaderProps {
 
 export function Header({ session, isLocked }: HeaderProps) {
   return (
-    <header className="relative w-full border-b border-zinc-800/80 bg-zinc-950/70 backdrop-blur-md z-30 transition-colors">
+    <header
+      className="relative z-30 w-full transition-colors"
+      style={{
+        /* Translucent charcoal glass with restrained blur */
+        backgroundColor: 'rgba(7, 7, 12, 0.55)',
+        backdropFilter: 'blur(16px) saturate(1.2)',
+        WebkitBackdropFilter: 'blur(16px) saturate(1.2)',
+        /* Subtle bottom border: thin crimson/white line */
+        borderBottom: '1px solid rgba(225, 29, 72, 0.15)',
+        boxShadow: '0 1px 0 rgba(255,255,255,0.04), 0 4px 24px rgba(0,0,0,0.3)',
+      }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         {/* Left: Event Branding & Geometric Symbols */}
         <div className="flex items-center space-x-4">
           {/* Geometric Emblem (○ △ □) */}
           <div
-            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-sm bg-zinc-900/90 border border-zinc-800 text-rose-500 shadow-[0_0_15px_rgba(225,29,72,0.15)]"
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-sm text-rose-500"
+            style={{
+              backgroundColor: 'rgba(12, 12, 18, 0.6)',
+              border: '1px solid rgba(225, 29, 72, 0.2)',
+              boxShadow: '0 0 12px rgba(225, 29, 72, 0.1)',
+            }}
             title="The Arena Triad: Circle, Triangle, Square"
           >
             <span className="text-sm font-black tracking-tighter">○</span>
@@ -41,10 +57,16 @@ export function Header({ session, isLocked }: HeaderProps) {
           </div>
         </div>
 
-        {/* Right: Configurable Team / Session Badge */}
+        {/* Right: Team / Session Badge */}
         <div className="flex items-center space-x-3 sm:space-x-5">
           {/* Status Capsule */}
-          <div className="hidden md:flex items-center space-x-2 px-3 py-1 rounded border border-zinc-800 bg-zinc-900/50">
+          <div
+            className="hidden md:flex items-center space-x-2 px-3 py-1 rounded"
+            style={{
+              backgroundColor: 'rgba(12, 12, 18, 0.5)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
             <span
               className={`inline-block w-2 h-2 rounded-full ${
                 isLocked
@@ -79,4 +101,3 @@ export function Header({ session, isLocked }: HeaderProps) {
     </header>
   );
 }
-

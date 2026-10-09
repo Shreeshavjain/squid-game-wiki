@@ -3,13 +3,19 @@ import React from 'react';
 /**
  * ARENA BACKGROUND
  * ================
- * Uses a fixed full-viewport image of the Squid Game staircase architecture.
+ * Fixed full-viewport staircase photograph with a restrained cinematic overlay.
  *
  * Layers (bottom-to-top):
- *   1. Photographic Background Layer: The staircase image with cover sizing and a slight blur.
- *   2. Cinematic Black Gradient Overlay: Dims the bright pastel colors to maintain text readability.
- *   3. Film-grain noise overlay: Preserves the gritty cinematic feel.
- *   4. Corner tactical telemetry labels.
+ *   1. Base obsidian fill (#07070a) – fallback while image loads
+ *   2. Photographic staircase image – sharp, cover-sized, fixed
+ *   3. Restrained dark gradient overlay – preserves image colour while
+ *      protecting text contrast, darkening edges and bottom
+ *   4. Film-grain noise overlay – subtle cinematic texture
+ *   5. Corner tactical telemetry labels
+ *
+ * Design intent: The staircase's natural pastel colours (pink, teal, yellow)
+ * should remain clearly recognizable. The overlay reduces brightness enough
+ * for white text readability without burying the architecture in black.
  */
 export function ArenaBackground() {
   return (
@@ -18,10 +24,13 @@ export function ArenaBackground() {
       aria-hidden="true"
       style={{ backgroundColor: '#07070a' }}
     >
-      {/* ── 1. The Photographic Background Layer ── */}
-      {/* 
-        We use a separate div for the background image so we can apply the blur filter 
-        to it without blurring the overlays or text. 
+      {/* ── 1. Photographic Background Layer ── */}
+      {/*
+        Sharp image with minimal processing.
+        - 0px blur: keeps the architecture crisp and recognizable.
+        - scale(1.01): tiny overscale prevents sub-pixel edge seams.
+        - Slight brightness/saturation reduction via filter keeps pastel tones
+          visible without competing with foreground UI.
       */}
       <div
         className="absolute inset-0 w-full h-full"
@@ -30,29 +39,47 @@ export function ArenaBackground() {
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          // 2px blur softens the background; scale 1.02 prevents blurred transparent edges from showing
-          filter: 'blur(2px)',
-          transform: 'scale(1.02)',
+          filter: 'brightness(0.95) saturate(0.90)',
+          transform: 'scale(1.01)',
         }}
       />
 
-      {/* ── 2. Cinematic Black Gradient Overlay ── */}
-      {/* 
-        Starts at ~65% opacity at the top to reduce overall brightness,
-        and darkens towards the bottom to ensure the cards and footer remain highly readable.
+      {/* ── 2. Restrained Dark Gradient Overlay ── */}
+      {/*
+        Multi-stop gradient designed for readability without burying the image:
+        - Top: light veil (0.35) so the staircase apex is visible
+        - Middle: moderate (0.45) where the card area lives
+        - Bottom: darker (0.72) to fade into the footer area
+        
+        TUNING: Increase the rgba alpha values to darken, decrease to reveal more image.
       */}
       <div
         className="absolute inset-0 w-full h-full"
         style={{
-          background:
-            'linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.75) 50%, rgba(7,7,10,0.95) 100%)',
+          background: [
+            'linear-gradient(to bottom,',
+            'rgba(7,7,10,0.15) 0%,',
+            'rgba(7,7,10,0.20) 25%,',
+            'rgba(7,7,10,0.25) 50%,',
+            'rgba(7,7,10,0.35) 75%,',
+            'rgba(7,7,10,0.50) 100%)',
+          ].join(' '),
         }}
       />
 
-      {/* ── 3. Film-grain noise overlay ── */}
+      {/* ── 3. Subtle edge contrast ── */}
+      <div
+        className="absolute inset-0 w-full h-full"
+        style={{
+          background:
+            'radial-gradient(ellipse 120% 120% at 50% 50%, transparent 60%, rgba(7,7,10,0.3) 100%)',
+        }}
+      />
+
+      {/* ── 4. Film-grain noise overlay ── */}
       <svg
         className="absolute inset-0 w-full h-full"
-        style={{ opacity: 0.032, mixBlendMode: 'overlay' }}
+        style={{ opacity: 0.028, mixBlendMode: 'overlay' }}
         aria-hidden="true"
       >
         <filter id="arena-grain">
@@ -66,18 +93,18 @@ export function ArenaBackground() {
         <rect width="100%" height="100%" filter="url(#arena-grain)" />
       </svg>
 
-      {/* ── 4. Corner telemetry labels ── */}
-      <div className="absolute top-5 left-5 font-mono text-[9px] tracking-widest text-zinc-600 uppercase leading-tight">
-        <span className="text-rose-500/70 mr-1.5">●</span>
+      {/* ── 5. Corner telemetry labels ── */}
+      <div className="absolute top-5 left-5 font-mono text-[9px] tracking-widest text-zinc-500/80 uppercase leading-tight">
+        <span className="text-rose-500/60 mr-1.5">●</span>
         CAM-01 // COMPLEX 07
       </div>
-      <div className="absolute top-5 right-5 font-mono text-[9px] tracking-widest text-zinc-600 uppercase text-right leading-tight">
+      <div className="absolute top-5 right-5 font-mono text-[9px] tracking-widest text-zinc-500/80 uppercase text-right leading-tight">
         SECTOR PROTOCOL // VER 2.40
       </div>
-      <div className="absolute bottom-5 left-5 font-mono text-[9px] tracking-widest text-zinc-700 uppercase leading-tight">
+      <div className="absolute bottom-5 left-5 font-mono text-[9px] tracking-widest text-zinc-600/70 uppercase leading-tight">
         SYS.LATENCY: 12ms // STABLE
       </div>
-      <div className="absolute bottom-5 right-5 font-mono text-[9px] tracking-widest text-zinc-700 uppercase text-right leading-tight">
+      <div className="absolute bottom-5 right-5 font-mono text-[9px] tracking-widest text-zinc-600/70 uppercase text-right leading-tight">
         COORD: 37°33&#x27;N 126°58&#x27;E
       </div>
     </div>
