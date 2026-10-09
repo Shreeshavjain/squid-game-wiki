@@ -28,12 +28,12 @@ export default function EntryPage() {
       <div 
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: "url('/images/squid-guards.jpg')",
+          backgroundImage: "url('/images/squid.jpg')",
           backgroundSize: 'cover',
-          backgroundPosition: 'center 30%', // Keeps focus towards upper/center where a face/guard usually is
+          backgroundPosition: 'center',
         }}
       >
-        <div className="absolute inset-0 bg-black/50" aria-hidden="true" />
+        <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
       </div>
 
       {/* Single Cohesive UI Component */}
