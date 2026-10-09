@@ -2,103 +2,79 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArenaBackground } from './components/ArenaBackground';
-import { DEFAULT_TEAM_SESSION } from './data/difficultyTiers';
 
 export default function EntryPage() {
   const router = useRouter();
-  const [teamId, setTeamId] = useState(DEFAULT_TEAM_SESSION.teamId);
-  const [teamName, setTeamName] = useState(DEFAULT_TEAM_SESSION.teamName);
-  const [sessionCode, setSessionCode] = useState(DEFAULT_TEAM_SESSION.sessionCode);
+  const [teamName, setTeamName] = useState('');
+  const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedName = teamName.trim();
+    if (!trimmedName) {
+      setError('Team name is required to enter.');
+      return;
+    }
     
-    // Pass session information to dashboard via query parameters
-    // since we do not have a backend or global state management yet.
     const params = new URLSearchParams();
-    params.set('teamId', teamId.trim() || 'TEAM-456');
-    params.set('teamName', teamName.trim() || 'UNREGISTERED SQUAD');
-    params.set('sessionCode', sessionCode.trim() || 'SESSION 01');
+    params.set('teamName', trimmedName);
     
     router.push(`/dashboard?${params.toString()}`);
   };
 
   return (
-    <div className="relative min-h-screen flex flex-col justify-center items-center text-zinc-100 overflow-x-hidden p-4">
-      <ArenaBackground />
-      
+    <main className="relative min-h-screen flex flex-col justify-center items-center overflow-hidden">
+      {/* Full-screen background with carefully chosen position and dark overlay */}
       <div 
-        className="relative z-10 w-full max-w-md rounded-xl shadow-2xl p-6 sm:p-8"
+        className="absolute inset-0 z-0"
         style={{
-          backgroundColor: 'rgba(10, 10, 14, 0.82)',
-          backdropFilter: 'blur(12px) saturate(1.1)',
-          WebkitBackdropFilter: 'blur(12px) saturate(1.1)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          backgroundImage: "url('/images/squid-guards.jpg')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center 30%', // Keeps focus towards upper/center where a face/guard usually is
         }}
       >
-        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4 mb-6">
-          <div className="flex items-center space-x-2">
-            <span className="text-rose-500 text-xs font-mono font-bold">●</span>
-            <h1 className="font-mono text-sm tracking-widest text-zinc-100 uppercase">
-              SQUAD REGISTRATION
-            </h1>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-xs font-mono tracking-wider text-zinc-400 uppercase mb-1.5">
-              Team Identifier Code
-            </label>
-            <input
-              type="text"
-              value={teamId}
-              onChange={(e) => setTeamId(e.target.value)}
-              placeholder="e.g. TEAM-456"
-              className="w-full px-4 py-2.5 bg-zinc-950/60 border border-zinc-700/50 rounded font-mono text-sm text-zinc-100 focus:outline-none focus:border-rose-500 transition-colors"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-mono tracking-wider text-zinc-400 uppercase mb-1.5">
-              Squad Display Name
-            </label>
-            <input
-              type="text"
-              value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
-              placeholder="e.g. SANG-WOO CONSORTIUM"
-              className="w-full px-4 py-2.5 bg-zinc-950/60 border border-zinc-700/50 rounded font-mono text-sm text-zinc-100 focus:outline-none focus:border-rose-500 transition-colors"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-mono tracking-wider text-zinc-400 uppercase mb-1.5">
-              Session / Bracket Code
-            </label>
-            <input
-              type="text"
-              value={sessionCode}
-              onChange={(e) => setSessionCode(e.target.value)}
-              placeholder="e.g. SESSION 01 // BRACKET A"
-              className="w-full px-4 py-2.5 bg-zinc-950/60 border border-zinc-700/50 rounded font-mono text-sm text-zinc-100 focus:outline-none focus:border-rose-500 transition-colors"
-              required
-            />
-          </div>
-
-          <div className="pt-4">
-            <button
-              type="submit"
-              className="w-full px-6 py-3 font-mono text-xs uppercase tracking-widest bg-rose-600 hover:bg-rose-500 text-white font-bold rounded shadow-[0_0_15px_rgba(225,29,72,0.4)] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0b10]"
-            >
-              ENTER THE ARENA
-            </button>
-          </div>
-        </form>
+        <div className="absolute inset-0 bg-black/50" aria-hidden="true" />
       </div>
-    </div>
+
+      {/* Single Cohesive UI Component */}
+      <div className="relative z-10 w-full max-w-lg px-6">
+        <form 
+          onSubmit={handleSubmit} 
+          className="flex items-center w-full rounded-full p-1.5 transition-all"
+          style={{
+            backgroundColor: 'rgba(20, 20, 26, 0.55)',
+            backdropFilter: 'blur(16px) saturate(1.2)',
+            WebkitBackdropFilter: 'blur(16px) saturate(1.2)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+          }}
+        >
+          <input
+            type="text"
+            value={teamName}
+            onChange={(e) => {
+              setTeamName(e.target.value);
+              if (error) setError('');
+            }}
+            placeholder="Enter your team name"
+            className="flex-1 bg-transparent border-none text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-0 px-5 font-mono text-sm sm:text-base tracking-wide"
+            aria-label="Team name"
+            aria-invalid={!!error}
+            aria-describedby={error ? "team-name-error" : undefined}
+          />
+          <button
+            type="submit"
+            className="bg-rose-600 hover:bg-rose-500 text-white font-mono text-xs sm:text-sm font-bold uppercase tracking-widest px-6 sm:px-8 py-3 rounded-full transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 shadow-[0_0_15px_rgba(225,29,72,0.3)]"
+          >
+            Enter
+          </button>
+        </form>
+        {error && (
+          <p id="team-name-error" className="mt-4 text-center text-xs font-mono text-rose-400 tracking-wide" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+    </main>
   );
 }
