@@ -91,35 +91,28 @@ function DashboardContent() {
         )}
 
         {/* Hero Section */}
-        <section 
-          className="text-center max-w-3xl mx-auto mb-8 sm:mb-10 p-6 sm:p-8 rounded-2xl"
-          style={{
-            backgroundColor: 'rgba(10, 10, 14, 0.45)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
-          }}
-        >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/60 border border-zinc-700/50 text-[11px] font-mono tracking-widest text-zinc-300 uppercase mb-4 shadow-sm">
+        <section className="text-center max-w-3xl mx-auto mb-8 sm:mb-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 text-[11px] font-mono tracking-widest text-zinc-300 uppercase mb-4 shadow-sm" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" aria-hidden="true" />
             <span>PHASE 01 // SECTOR ALLOCATION PROTOCOL</span>
           </div>
 
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight uppercase font-sans text-zinc-50 leading-none" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight uppercase font-sans text-zinc-50 leading-none" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.8)' }}>
             CHOOSE YOUR{' '}<span className="text-rose-500">GAME</span>
           </h2>
 
-          <p className="mt-4 text-sm text-zinc-200 leading-relaxed max-w-2xl mx-auto font-medium">
+          <p className="mt-4 text-sm leading-relaxed max-w-2xl mx-auto font-medium" style={{ color: '#F5F2F3', textShadow: '0 2px 8px rgba(0,0,0,0.7)' }}>
             Review the three trial sectors. Each tier carries distinct algorithmic constraints,
             strict time caps, and escalating penalty multipliers. Once your squad captain
             confirms, the assignment is locked.
           </p>
 
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] font-mono text-zinc-300 uppercase tracking-widest">
-            <span className="bg-zinc-900/50 px-2 py-0.5 rounded border border-zinc-700/30">[○] TIER 1: WORKER</span>
-            <span className="bg-zinc-900/50 px-2 py-0.5 rounded border border-zinc-700/30">[△] TIER 2: SOLDIER</span>
-            <span className="bg-zinc-900/50 px-2 py-0.5 rounded border border-zinc-700/30">[□] TIER 3: SUPERVISOR</span>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] font-mono text-zinc-300 uppercase tracking-widest" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
+            <span>[○] TIER 1: WORKER</span>
+            <span className="text-zinc-500" aria-hidden="true">•</span>
+            <span>[△] TIER 2: SOLDIER</span>
+            <span className="text-zinc-500" aria-hidden="true">•</span>
+            <span>[□] TIER 3: SUPERVISOR</span>
           </div>
         </section>
 
