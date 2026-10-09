@@ -70,7 +70,7 @@ export default function Home() {
       />
 
       {/* 3. Main Dashboard Workspace */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 flex flex-col items-center">
+      <main className="relative z-10 flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 flex flex-col items-center">
         {/* If locked, display top confirmation status banner */}
         {lockedTier && (
           <LockedBanner
@@ -145,7 +145,7 @@ export default function Home() {
       />
 
       {/* Bottom Telemetry Bar */}
-      <footer className="w-full border-t border-zinc-900 bg-[#060608]/90 py-4 px-4 sm:px-8 text-center text-zinc-600 font-mono text-[11px] tracking-wider uppercase">
+      <footer className="relative z-10 w-full border-t border-zinc-900 bg-[#060608]/90 py-4 px-4 sm:px-8 text-center text-zinc-600 font-mono text-[11px] tracking-wider uppercase">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>THE ARENA SYSTEM // ALL RIGHTS RESERVED</span>
           <span>
