@@ -59,4 +59,9 @@ export interface QuizProgress {
   /** Locked-in answers keyed by question id (option key for MCQ, typed text otherwise) */
   answers: Record<string, string>;
   completed: boolean;
+  /** Server-calculated result, for quizzes that are auto-scored */
+  score?: number;
+  maxScore?: number;
+  /** Per-question outcome from the server (never includes the correct option) */
+  results?: Record<string, { correct: boolean; points: number }>;
 }

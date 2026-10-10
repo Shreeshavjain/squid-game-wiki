@@ -14,6 +14,7 @@ export default function MediumQuizPage() {
         tier={{ ...MEDIUM_TIER, id: 'medium' }}
         quizTitle="Open Source & Tech Challenge"
         questions={MEDIUM_QUIZ}
+        scoreEndpoint="/api/quiz/medium/score"
       />
     </Suspense>
   );

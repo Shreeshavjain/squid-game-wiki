@@ -87,9 +87,14 @@ interface QuizRunnerProps {
   /** Shown above the progress bar, e.g. "Open Source & Tech Challenge" */
   quizTitle: string;
   questions: readonly QuizQuestion[];
+  /**
+   * Route handler that grades the final answers server-side (the answer key
+   * never reaches the browser). Omit for quizzes graded by the organisers.
+   */
+  scoreEndpoint?: string;
 }
 
-export function QuizRunner({ tier, quizTitle, questions }: QuizRunnerProps) {
+export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRunnerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const teamName = searchParams.get('teamName') || DEFAULT_TEAM_SESSION.teamName;
@@ -147,17 +152,43 @@ export function QuizRunner({ tier, quizTitle, questions }: QuizRunnerProps) {
     commit({ ...progress, current: index });
   };
 
-  const handleSubmit = () => {
-    if (!progress || !question || !answer) return;
-    commit({
-      current: isLast ? progress.current : progress.current + 1,
+  const [isScoring, setIsScoring] = useState(false);
+  const [scoreError, setScoreError] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!progress || !question || !answer || isScoring) return;
+    const answers = {
+      ...progress.answers,
       // Unscramble input is displayed uppercase, so store it the way the team saw it
-      answers: {
-        ...progress.answers,
-        [question.id]: question.kind === 'unscramble' ? answer.toUpperCase() : answer,
-      },
-      completed: isLast,
-    });
+      [question.id]: question.kind === 'unscramble' ? answer.toUpperCase() : answer,
+    };
+
+    if (!isLast) {
+      commit({ ...progress, current: progress.current + 1, answers });
+      return;
+    }
+
+    // Final submit: auto-scored quizzes are graded on the server before finishing
+    let result: Pick<QuizProgress, 'score' | 'maxScore' | 'results'> | null = null;
+    if (scoreEndpoint) {
+      setIsScoring(true);
+      setScoreError(false);
+      try {
+        const res = await fetch(scoreEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers }),
+        });
+        if (!res.ok) throw new Error(`Scoring failed: ${res.status}`);
+        result = await res.json();
+      } catch {
+        setScoreError(true);
+        return;
+      } finally {
+        setIsScoring(false);
+      }
+    }
+    commit({ ...progress, answers, completed: true, ...result });
   };
 
   return (
@@ -292,7 +323,7 @@ export function QuizRunner({ tier, quizTitle, questions }: QuizRunnerProps) {
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    disabled={!answer}
+                    disabled={!answer || isScoring}
                     className={[
                       'px-6 py-3 rounded-full font-mono text-xs uppercase tracking-widest font-bold transition-all duration-200',
                       'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black',
@@ -302,9 +333,14 @@ export function QuizRunner({ tier, quizTitle, questions }: QuizRunnerProps) {
                         : 'cursor-not-allowed bg-zinc-900/60 text-zinc-600 border border-zinc-800',
                     ].join(' ')}
                   >
-                    {isLast ? 'Submit' : 'Next →'}
+                    {isScoring ? 'Calculating…' : isLast ? 'Submit' : 'Next →'}
                   </button>
                 </div>
+                {scoreError && (
+                  <p role="alert" className="mt-3 text-right font-mono text-[11px] text-rose-400">
+                    Couldn&apos;t submit — check your connection and press Submit again.
+                  </p>
+                )}
               </section>
             ) : (
               /* ── Completion ── */
@@ -318,14 +354,77 @@ export function QuizRunner({ tier, quizTitle, questions }: QuizRunnerProps) {
                 <h2 className="mt-4 text-2xl sm:text-3xl font-black tracking-tight text-zinc-50 uppercase">
                   Trial complete
                 </h2>
-                <p className="mt-3 text-sm text-zinc-300 leading-relaxed max-w-md mx-auto">
-                  All {total} answers from <strong className="text-zinc-100">{teamName}</strong> have been
-                  locked in. Results will be announced by the organisers.
-                </p>
+                {progress.score !== undefined ? (
+                  <>
+                    <p className="mt-3 text-sm text-zinc-300 leading-relaxed max-w-md mx-auto">
+                      All {total} answers from <strong className="text-zinc-100">{teamName}</strong> have been submitted.
+                    </p>
+                    <div className="mt-6 inline-flex flex-col items-center rounded-2xl border border-zinc-700/50 bg-zinc-950/60 px-10 py-5">
+                      <span className="font-mono text-[10px] tracking-[0.3em] uppercase text-zinc-500">Your score</span>
+                      <span
+                        className={`mt-1 text-5xl font-black tabular-nums ${progress.score >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}
+                      >
+                        {progress.score}
+                      </span>
+                      <span className="mt-1 font-mono text-xs text-zinc-500">out of {progress.maxScore}</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-3 text-sm text-zinc-300 leading-relaxed max-w-md mx-auto">
+                    All {total} answers from <strong className="text-zinc-100">{teamName}</strong> have been
+                    locked in. Results will be announced by the organisers.
+                  </p>
+                )}
 
-                {/* Short answers (MCQ letters, single words) fit in tiles; long or
-                    multi-line written answers are listed in full */}
-                {Object.values(progress.answers).every((v) => v.length <= 12 && !v.includes('\n')) ? (
+                {/* Auto-scored: each answer with ✓/✗ and its points. Otherwise short
+                    answers (single words) fit in tiles and long ones are listed in full. */}
+                {progress.results ? (
+                  <ul className="mt-6 space-y-2 text-left">
+                    {questions.map((q, i) => {
+                      const result = progress.results?.[q.id];
+                      const picked = progress.answers[q.id];
+                      const optionText = q.kind === 'mcq' ? q.options.find((o) => o.key === picked)?.text : undefined;
+                      return (
+                        <li
+                          key={q.id}
+                          className={[
+                            'flex items-center gap-3 rounded-lg border px-4 py-3',
+                            result?.correct ? 'border-emerald-500/30 bg-emerald-950/20' : 'border-rose-500/30 bg-rose-950/20',
+                          ].join(' ')}
+                        >
+                          <span
+                            className={[
+                              'shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold',
+                              result?.correct ? 'bg-emerald-400 text-zinc-950' : 'bg-rose-500 text-white',
+                            ].join(' ')}
+                            aria-label={result?.correct ? 'Correct' : 'Wrong'}
+                          >
+                            {result?.correct ? '✓' : '✗'}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+                              Q{i + 1}
+                              {q.kind === 'mcq' || q.kind === 'written' ? ` · ${q.title}` : ''}
+                            </div>
+                            <div className="mt-0.5 text-sm text-zinc-200 truncate">
+                              <span className="font-mono font-bold text-zinc-50">{picked ?? '—'}</span>
+                              {optionText && (
+                                <span className="text-zinc-400">
+                                  {' '}· <RichText text={optionText} />
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span
+                            className={`shrink-0 font-mono text-base font-black tabular-nums ${result?.correct ? 'text-emerald-400' : 'text-rose-500'}`}
+                          >
+                            {result && result.points > 0 ? `+${result.points}` : result?.points}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : Object.values(progress.answers).every((v) => v.length <= 12 && !v.includes('\n')) ? (
                   <div className="mt-6 grid grid-cols-2 sm:grid-cols-5 gap-2 max-w-xl mx-auto">
                     {questions.map((q, i) => (
                       <div key={q.id} className="rounded-lg border border-zinc-700/40 bg-zinc-950/60 px-2 py-2 min-w-0">
