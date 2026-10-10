@@ -452,14 +452,19 @@ function DescriptiveBody({
       <label htmlFor="quiz-answer" className="mt-5 block font-mono text-[10px] tracking-widest uppercase text-zinc-500">
         Your answer
       </label>
-      <input
+      {/* Multi-line like a notepad: wraps long answers and grows with them.
+          Enter adds a new line; Ctrl/⌘ + Enter submits. */}
+      <textarea
         id="quiz-answer"
-        type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') onSubmit();
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            onSubmit();
+          }
         }}
+        rows={3}
         autoFocus
         autoComplete="off"
         autoCapitalize={isEmoji ? 'off' : 'characters'}
@@ -467,12 +472,16 @@ function DescriptiveBody({
         placeholder={isEmoji ? 'Type your answer…' : `Type the ${question.letters.length}-letter word…`}
         aria-describedby="quiz-question"
         className={[
-          'mt-2 w-full rounded-xl border border-zinc-700/60 bg-zinc-950/70 px-4 py-3.5',
-          'text-base text-zinc-50 placeholder:text-zinc-600 outline-none transition-all duration-150',
+          'mt-2 block w-full rounded-xl border border-zinc-700/60 bg-zinc-950/70 px-4 py-3.5',
+          'text-base leading-relaxed text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow] duration-150',
+          'resize-none [field-sizing:content] min-h-[5.5rem] max-h-64 overflow-y-auto whitespace-pre-wrap break-words',
           isEmoji ? '' : 'font-mono uppercase tracking-[0.3em]',
           theme.input,
         ].join(' ')}
       />
+      <p className="mt-1.5 font-mono text-[10px] tracking-wider text-zinc-600 uppercase">
+        Press Ctrl / ⌘ + Enter to submit
+      </p>
     </>
   );
 }
