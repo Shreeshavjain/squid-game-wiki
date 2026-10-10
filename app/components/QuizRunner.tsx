@@ -37,6 +37,7 @@ const QUIZ_THEMES = {
     optionIdle: 'border-zinc-700/50 bg-zinc-950/50 text-zinc-300 hover:border-emerald-400/50 hover:bg-zinc-900/60',
     badgeSelected: 'border-emerald-400 bg-emerald-400 text-zinc-950',
     input: 'focus:border-emerald-400 focus:shadow-[0_0_20px_rgba(16,185,129,0.18)]',
+    caret: 'caret-emerald-400',
     button: 'bg-emerald-400 text-zinc-950 hover:bg-emerald-300 shadow-[0_0_22px_rgba(16,185,129,0.4)]',
   },
   medium: {
@@ -51,6 +52,7 @@ const QUIZ_THEMES = {
     optionIdle: 'border-zinc-700/50 bg-zinc-950/50 text-zinc-300 hover:border-amber-400/50 hover:bg-zinc-900/60',
     badgeSelected: 'border-amber-400 bg-amber-400 text-zinc-950',
     input: 'focus:border-amber-400 focus:shadow-[0_0_20px_rgba(245,158,11,0.18)]',
+    caret: 'caret-amber-400',
     button: 'bg-amber-400 text-zinc-950 hover:bg-amber-300 shadow-[0_0_22px_rgba(245,158,11,0.4)]',
   },
 } as const;
@@ -241,6 +243,7 @@ export function QuizRunner({ tier, quizTitle, questions }: QuizRunnerProps) {
                     value={value}
                     onChange={setDraft}
                     onSubmit={handleSubmit}
+                    isLast={isLast}
                   />
                 )}
 
@@ -274,7 +277,7 @@ export function QuizRunner({ tier, quizTitle, questions }: QuizRunnerProps) {
                         : 'cursor-not-allowed bg-zinc-900/60 text-zinc-600 border border-zinc-800',
                     ].join(' ')}
                   >
-                    Submit
+                    {isLast ? 'Submit' : 'Next →'}
                   </button>
                 </div>
               </section>
@@ -402,6 +405,7 @@ function DescriptiveBody({
   value,
   onChange,
   onSubmit,
+  isLast,
 }: {
   question: Extract<QuizQuestion, { kind: 'emoji' | 'unscramble' }>;
   number: number;
@@ -409,6 +413,7 @@ function DescriptiveBody({
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
+  isLast: boolean;
 }) {
   const isEmoji = question.kind === 'emoji';
 
@@ -452,8 +457,9 @@ function DescriptiveBody({
       <label htmlFor="quiz-answer" className="mt-5 block font-mono text-[10px] tracking-widest uppercase text-zinc-500">
         Your answer
       </label>
-      {/* Multi-line like a notepad: wraps long answers and grows with them.
-          Enter adds a new line; Ctrl/⌘ + Enter submits. */}
+      {/* Works like a notepad: text stays on its line (no auto-wrap, scrolls sideways)
+          and only Enter starts a new line; the box grows with each line.
+          Ctrl/⌘ + Enter does the same as the Next / Submit button. */}
       <textarea
         id="quiz-answer"
         value={value}
@@ -465,6 +471,7 @@ function DescriptiveBody({
           }
         }}
         rows={3}
+        wrap="off"
         autoFocus
         autoComplete="off"
         autoCapitalize={isEmoji ? 'off' : 'characters'}
@@ -474,13 +481,14 @@ function DescriptiveBody({
         className={[
           'mt-2 block w-full rounded-xl border border-zinc-700/60 bg-zinc-950/70 px-4 py-3.5',
           'text-base leading-relaxed text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow] duration-150',
-          'resize-none [field-sizing:content] min-h-[5.5rem] max-h-64 overflow-y-auto whitespace-pre-wrap break-words',
+          'resize-none [field-sizing:content] min-h-[5.5rem] max-h-64 overflow-auto whitespace-pre',
           isEmoji ? '' : 'font-mono uppercase tracking-[0.3em]',
           theme.input,
+          theme.caret,
         ].join(' ')}
       />
       <p className="mt-1.5 font-mono text-[10px] tracking-wider text-zinc-600 uppercase">
-        Press Ctrl / ⌘ + Enter to submit
+        Press Ctrl / ⌘ + Enter for {isLast ? 'submit' : 'next'}
       </p>
     </>
   );
