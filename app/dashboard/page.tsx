@@ -12,7 +12,7 @@ import { LockedBanner } from '../components/LockedBanner';
 import { getLockedTier, setLockedTier as persistLockedTier } from '../lib/trialStorage';
 
 // Tiers that are played as a quiz on their own page
-const QUIZ_TIERS: readonly DifficultyTier['id'][] = ['easy', 'medium'];
+const QUIZ_TIERS: readonly DifficultyTier['id'][] = ['easy', 'medium', 'hard'];
 const quizUrl = (tierId: DifficultyTier['id'], teamName: string) =>
   `/quiz/${tierId}?${new URLSearchParams({ teamName })}`;
 

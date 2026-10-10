@@ -4,7 +4,7 @@ import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DEFAULT_TEAM_SESSION } from '../data/difficultyTiers';
 import { DifficultyTier } from '../types/difficulty';
-import { QuizProgress, QuizQuestion } from '../types/quiz';
+import { QuizContextBlock, QuizProgress, QuizQuestion } from '../types/quiz';
 import { ArenaBackground } from './ArenaBackground';
 import { Header } from './Header';
 import { RichText } from './RichText';
@@ -54,6 +54,21 @@ const QUIZ_THEMES = {
     input: 'focus:border-amber-400 focus:shadow-[0_0_20px_rgba(245,158,11,0.18)]',
     caret: 'caret-amber-400',
     button: 'bg-amber-400 text-zinc-950 hover:bg-amber-300 shadow-[0_0_22px_rgba(245,158,11,0.4)]',
+  },
+  hard: {
+    text: 'text-rose-400',
+    dot: 'bg-rose-500',
+    segmentDone: 'bg-rose-500',
+    cardBorder: 'border-rose-500/25',
+    topBar: 'from-rose-500/0 via-rose-500 to-rose-500/0',
+    underline: 'underline underline-offset-4 decoration-rose-500',
+    ring: 'focus-visible:ring-rose-500',
+    optionSelected: 'border-rose-500 bg-rose-500/10 text-zinc-50 shadow-[0_0_20px_rgba(225,29,72,0.2)]',
+    optionIdle: 'border-zinc-700/50 bg-zinc-950/50 text-zinc-300 hover:border-rose-500/50 hover:bg-zinc-900/60',
+    badgeSelected: 'border-rose-500 bg-rose-500 text-white',
+    input: 'focus:border-rose-500 focus:shadow-[0_0_20px_rgba(225,29,72,0.2)]',
+    caret: 'caret-rose-400',
+    button: 'bg-rose-500 text-white hover:bg-rose-400 shadow-[0_0_22px_rgba(225,29,72,0.45)]',
   },
 } as const;
 
@@ -235,6 +250,16 @@ export function QuizRunner({ tier, quizTitle, questions }: QuizRunnerProps) {
                     selected={value}
                     onSelect={setDraft}
                   />
+                ) : question.kind === 'written' ? (
+                  <WrittenBody
+                    question={question}
+                    number={progress.current + 1}
+                    theme={theme}
+                    value={value}
+                    onChange={setDraft}
+                    onSubmit={handleSubmit}
+                    isLast={isLast}
+                  />
                 ) : (
                   <DescriptiveBody
                     question={question}
@@ -298,16 +323,31 @@ export function QuizRunner({ tier, quizTitle, questions }: QuizRunnerProps) {
                   locked in. Results will be announced by the organisers.
                 </p>
 
-                <div className="mt-6 grid grid-cols-2 sm:grid-cols-5 gap-2 max-w-xl mx-auto">
-                  {questions.map((q, i) => (
-                    <div key={q.id} className="rounded-lg border border-zinc-700/40 bg-zinc-950/60 px-2 py-2 min-w-0">
-                      <div className="font-mono text-[10px] text-zinc-500">Q{i + 1}</div>
-                      <div className={`font-mono text-sm font-bold truncate ${theme.text}`} title={progress.answers[q.id]}>
-                        {progress.answers[q.id] ?? '—'}
+                {/* Short answers (MCQ letters, single words) fit in tiles; long or
+                    multi-line written answers are listed in full */}
+                {Object.values(progress.answers).every((v) => v.length <= 12 && !v.includes('\n')) ? (
+                  <div className="mt-6 grid grid-cols-2 sm:grid-cols-5 gap-2 max-w-xl mx-auto">
+                    {questions.map((q, i) => (
+                      <div key={q.id} className="rounded-lg border border-zinc-700/40 bg-zinc-950/60 px-2 py-2 min-w-0">
+                        <div className="font-mono text-[10px] text-zinc-500">Q{i + 1}</div>
+                        <div className={`font-mono text-sm font-bold truncate ${theme.text}`} title={progress.answers[q.id]}>
+                          {progress.answers[q.id] ?? '—'}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-6 space-y-2 text-left">
+                    {questions.map((q, i) => (
+                      <div key={q.id} className="flex gap-3 rounded-lg border border-zinc-700/40 bg-zinc-950/60 px-4 py-3">
+                        <div className={`shrink-0 font-mono text-xs font-bold pt-0.5 ${theme.text}`}>Q{i + 1}</div>
+                        <div className="min-w-0 flex-1 overflow-x-auto font-mono text-sm text-zinc-200 whitespace-pre">
+                          {progress.answers[q.id] ?? '—'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
             )}
           </>
@@ -337,24 +377,7 @@ function McqBody({
         <span className={theme.text}>Q{number}.</span> {question.title}
       </h2>
 
-      {question.context.length > 0 && (
-        <div className="mt-4 space-y-3 text-sm text-zinc-300 leading-relaxed">
-          {question.context.map((block, i) =>
-            block.type === 'code' ? (
-              <pre
-                key={i}
-                className="font-mono text-sm text-zinc-100 bg-zinc-950/70 border border-zinc-700/40 rounded-lg px-4 py-2.5 overflow-x-auto"
-              >
-                {block.value}
-              </pre>
-            ) : (
-              <p key={i}>
-                <RichText text={block.value} />
-              </p>
-            )
-          )}
-        </div>
-      )}
+      <ContextBlocks blocks={question.context} />
 
       <p id="quiz-question" className="mt-5 text-base sm:text-lg font-bold text-zinc-50 leading-snug">
         <RichText text={question.question} boldClassName={theme.underline} />
@@ -453,7 +476,153 @@ function DescriptiveBody({
         <span className={`font-bold ${theme.text}`}>Hint:</span> {question.hint}
       </p>
 
-      {/* ── Answer ── */}
+      <AnswerBox
+        value={value}
+        onChange={onChange}
+        onSubmit={onSubmit}
+        isLast={isLast}
+        theme={theme}
+        monospaceCaps={!isEmoji}
+        placeholder={isEmoji ? 'Type your answer…' : `Type the ${question.letters.length}-letter word…`}
+      />
+    </>
+  );
+}
+
+// ── Written (free-form descriptive with context) ────────────────
+function WrittenBody({
+  question,
+  number,
+  theme,
+  value,
+  onChange,
+  onSubmit,
+  isLast,
+}: {
+  question: Extract<QuizQuestion, { kind: 'written' }>;
+  number: number;
+  theme: QuizTheme;
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  isLast: boolean;
+}) {
+  return (
+    <>
+      <h2 className="mt-2 text-xl sm:text-2xl font-black tracking-tight text-zinc-50">
+        <span className={theme.text}>Q{number}.</span> {question.title}
+      </h2>
+
+      <ContextBlocks blocks={question.context} />
+
+      <p id="quiz-question" className="mt-5 text-base sm:text-lg font-bold text-zinc-50 leading-snug">
+        <RichText text={question.question} boldClassName={theme.underline} />
+      </p>
+
+      <AnswerBox
+        value={value}
+        onChange={onChange}
+        onSubmit={onSubmit}
+        isLast={isLast}
+        theme={theme}
+        placeholder={question.placeholder ?? 'Type your answer…'}
+      />
+    </>
+  );
+}
+
+// ── Shared: question context (text, code, emoji row, table) ─────
+function ContextBlocks({ blocks }: { blocks: readonly QuizContextBlock[] }) {
+  if (blocks.length === 0) return null;
+  return (
+    <div className="mt-4 space-y-3 text-sm text-zinc-300 leading-relaxed">
+      {blocks.map((block, i) => {
+        switch (block.type) {
+          case 'code':
+            return (
+              <pre
+                key={i}
+                className="font-mono text-sm text-zinc-100 bg-zinc-950/70 border border-zinc-700/40 rounded-lg px-4 py-2.5 overflow-x-auto"
+              >
+                {block.value}
+              </pre>
+            );
+          case 'emojis':
+            return (
+              <div
+                key={i}
+                className="grid rounded-xl border border-zinc-700/40 bg-zinc-950/60 divide-x divide-zinc-700/40"
+                style={{ gridTemplateColumns: `repeat(${block.items.length}, minmax(0, 1fr))` }}
+              >
+                {block.items.map((item) => (
+                  <div key={item.label} className="flex flex-col items-center gap-2 py-4">
+                    <span className="text-4xl sm:text-5xl leading-none">{item.emoji}</span>
+                    <span className="font-mono text-xs text-zinc-400">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          case 'table':
+            return (
+              <div key={i} className="overflow-x-auto rounded-xl border border-zinc-700/40">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-zinc-900/80 font-mono text-[10px] uppercase tracking-widest text-zinc-400">
+                    <tr>
+                      {block.headers.map((h) => (
+                        <th key={h} className="px-4 py-2.5 font-medium">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/80 bg-zinc-950/50">
+                    {block.rows.map((row, r) => (
+                      <tr key={r}>
+                        {row.map((cell, c) => (
+                          <td
+                            key={c}
+                            className={c === 0 ? 'px-4 py-2.5 font-semibold text-zinc-100 whitespace-nowrap' : 'px-4 py-2.5 text-zinc-300'}
+                          >
+                            <RichText text={cell} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          default:
+            return (
+              <p key={i}>
+                <RichText text={block.value} />
+              </p>
+            );
+        }
+      })}
+    </div>
+  );
+}
+
+// ── Shared: notepad-style answer box ────────────────────────────
+function AnswerBox({
+  value,
+  onChange,
+  onSubmit,
+  isLast,
+  theme,
+  placeholder,
+  monospaceCaps = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  isLast: boolean;
+  theme: QuizTheme;
+  placeholder: string;
+  /** Uppercase monospace entry (word unscramble) */
+  monospaceCaps?: boolean;
+}) {
+  return (
+    <>
       <label htmlFor="quiz-answer" className="mt-5 block font-mono text-[10px] tracking-widest uppercase text-zinc-500">
         Your answer
       </label>
@@ -474,15 +643,15 @@ function DescriptiveBody({
         wrap="off"
         autoFocus
         autoComplete="off"
-        autoCapitalize={isEmoji ? 'off' : 'characters'}
+        autoCapitalize={monospaceCaps ? 'characters' : 'off'}
         spellCheck={false}
-        placeholder={isEmoji ? 'Type your answer…' : `Type the ${question.letters.length}-letter word…`}
+        placeholder={placeholder}
         aria-describedby="quiz-question"
         className={[
           'mt-2 block w-full rounded-xl border border-zinc-700/60 bg-zinc-950/70 px-4 py-3.5',
           'text-base leading-relaxed text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow] duration-150',
           'resize-none [field-sizing:content] min-h-[5.5rem] max-h-64 overflow-auto whitespace-pre',
-          isEmoji ? '' : 'font-mono uppercase tracking-[0.3em]',
+          monospaceCaps ? 'font-mono uppercase tracking-[0.3em]' : '',
           theme.input,
           theme.caret,
         ].join(' ')}

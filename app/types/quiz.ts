@@ -5,10 +5,11 @@ export interface QuizOption {
   readonly text: string;
 }
 
-export interface QuizContextBlock {
-  readonly type: 'text' | 'code';
-  readonly value: string;
-}
+export type QuizContextBlock =
+  | { readonly type: 'text' | 'code'; readonly value: string }
+  /** Row of labelled emojis, e.g. (a) ☕ (b) 💎 */
+  | { readonly type: 'emojis'; readonly items: readonly { readonly label: string; readonly emoji: string }[] }
+  | { readonly type: 'table'; readonly headers: readonly string[]; readonly rows: readonly (readonly string[])[] };
 
 interface QuizQuestionBase {
   readonly id: string;
@@ -39,7 +40,17 @@ export interface UnscrambleQuestion extends QuizQuestionBase {
   readonly hint: string;
 }
 
-export type QuizQuestion = McqQuestion | EmojiQuestion | UnscrambleQuestion;
+/** Descriptive: free-form written answer to a prompt with optional context */
+export interface WrittenQuestion extends QuizQuestionBase {
+  readonly kind: 'written';
+  readonly title: string;
+  readonly context: readonly QuizContextBlock[];
+  readonly question: string;
+  /** Placeholder for the answer box, e.g. to suggest a per-part layout */
+  readonly placeholder?: string;
+}
+
+export type QuizQuestion = McqQuestion | EmojiQuestion | UnscrambleQuestion | WrittenQuestion;
 
 /** Persisted per team so a refresh can't restart or revisit questions */
 export interface QuizProgress {
