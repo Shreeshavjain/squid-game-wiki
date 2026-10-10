@@ -16,7 +16,7 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     symbol: 'circle',
     guardRole: 'WORKER // CIRCLE',
     riskLevel: 'LOW RISK',
-    riskDescriptor: 'STEADY CADENCE // PREDICTABLE PITFALLS',
+    riskDescriptor: 'DESCRIPTIVE ANSWERS',
     timeLimit: '45 MINS',
     bountyMultiplier: '1.0× BASE POOL',
     survivalRate: 'EST. SURVIVAL 82%',
@@ -45,6 +45,7 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     ],
     penaltyNotice: 'Penalty decay of 5% per failed compilation after the second attempt.',
     accentColorHex: '#10b981', // emerald 'green light' for circle
+    scoring: { correct: 5, wrong: 0 },
   },
   {
     id: 'medium',

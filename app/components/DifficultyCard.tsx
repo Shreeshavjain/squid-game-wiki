@@ -162,7 +162,8 @@ export function DifficultyCard({
               </div>
               <div className="px-3 py-2.5">
                 <div className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">Wrong answer</div>
-                <div className="mt-1 text-lg font-bold text-rose-500 tabular-nums">{tier.scoring.wrong}</div>
+                {/* Always shown as a deduction, so a zero penalty reads "-0" */}
+                <div className="mt-1 text-lg font-bold text-rose-500 tabular-nums">-{Math.abs(tier.scoring.wrong)}</div>
               </div>
             </>
           ) : (
