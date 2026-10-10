@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { DIFFICULTY_TIERS, DEFAULT_TEAM_SESSION } from '../data/difficultyTiers';
 import { DifficultyTier, TeamSessionInfo } from '../types/difficulty';
 import { Header } from '../components/Header';
@@ -9,8 +9,10 @@ import { ArenaBackground } from '../components/ArenaBackground';
 import { DifficultyCard } from '../components/DifficultyCard';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { LockedBanner } from '../components/LockedBanner';
+import { getLockedTier, setLockedTier as persistLockedTier } from '../lib/trialStorage';
 
 function DashboardContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   // Configurable team & session state
@@ -30,6 +32,14 @@ function DashboardContent() {
   // Local prototype locked state (tier irrevocably locked in current session)
   const [lockedTier, setLockedTier] = useState<DifficultyTier | null>(null);
 
+  // Medium is played on its own page; replace() keeps the dashboard out of history
+  const quizUrl = `/quiz/medium?${new URLSearchParams({ teamName: session.teamName })}`;
+
+  // A team that already locked Medium can't come back here to pick again
+  useEffect(() => {
+    if (getLockedTier(session.teamName) === 'medium') router.replace(quizUrl);
+  }, [session.teamName, quizUrl, router]);
+
   // Card selection clicked -> opens confirmation modal (DOES NOT LOCK DIRECTLY)
   const handleInitiateSelection = (tier: DifficultyTier) => {
     setSelectedTierForModal(tier);
@@ -42,6 +52,11 @@ function DashboardContent() {
 
   // Explicit confirmation from modal -> Locks choice
   const handleConfirmLock = (tier: DifficultyTier) => {
+    if (tier.id === 'medium') {
+      persistLockedTier(session.teamName, 'medium');
+      router.replace(quizUrl);
+      return;
+    }
     setLockedTier(tier);
     setSelectedTierForModal(null);
     setSession((prev) => ({

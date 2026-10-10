@@ -3,6 +3,7 @@
 import React from 'react';
 import { DifficultyTier } from '../types/difficulty';
 import { GeometricIcon } from './GeometricIcon';
+import { RichText } from './RichText';
 
 interface DifficultyCardProps {
   tier: DifficultyTier;
@@ -200,14 +201,7 @@ export function DifficultyCard({
 
       {/* ── Overview text ── */}
       <p className="relative mt-4 text-[13px] text-zinc-400 leading-normal">
-        {/* *text* in the overview renders bold */}
-        {tier.overview.split(/\*(.+?)\*/).map((part, i) =>
-          i % 2 === 1 ? (
-            <strong key={i} className="font-semibold text-zinc-100">{part}</strong>
-          ) : (
-            part
-          )
-        )}
+        <RichText text={tier.overview} />
       </p>
 
       {/* ── Action button (pinned to bottom so buttons align across cards) ── */}
