@@ -23,7 +23,7 @@ export default function EntryPage() {
   };
 
   return (
-    <main className="relative min-h-screen flex flex-col justify-center items-center overflow-hidden">
+    <main className="relative min-h-screen flex flex-col items-center overflow-hidden px-4 py-6 sm:py-8">
       {/* Full-screen background with carefully chosen position and dark overlay */}
       <div 
         className="absolute inset-0 z-0"
@@ -36,8 +36,18 @@ export default function EntryPage() {
         <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
       </div>
 
-      {/* Single Cohesive UI Component */}
-      <div className="relative z-10 w-full max-w-lg px-6">
+      {/* Main Content Group (Logo + Input positioned together) */}
+      <div className="relative z-10 w-full flex flex-col items-center mt-2 sm:mt-6">
+        
+        {/* Squid Game Logo (Standalone, no background card) */}
+        <img 
+          src="/images/squid-game-logo.png" 
+          alt="Squid Game" 
+          className="w-[280px] sm:w-[440px] h-auto object-contain drop-shadow-2xl"
+        />
+
+        {/* Middle: Single Cohesive UI Component */}
+        <div className="w-full max-w-lg px-2 sm:px-6 mt-6 sm:mt-8">
         <form 
           onSubmit={handleSubmit} 
           className="flex items-center w-full rounded-full p-1.5 transition-all"
@@ -74,6 +84,25 @@ export default function EntryPage() {
             {error}
           </p>
         )}
+        </div>
+      </div>
+
+      {/* Bottom: Partner Branding with Light Cards */}
+      <div className="relative z-10 w-full flex items-center justify-center gap-4 sm:gap-6 mt-auto pt-8 pb-safe mb-6 sm:mb-10">
+        <div className="bg-zinc-50 rounded-xl p-2.5 sm:p-3 border border-zinc-200/80 shadow-lg flex items-center justify-center">
+          <img 
+            src="/images/wikiclub-logo.png" 
+            alt="WikiClub" 
+            className="w-20 sm:w-[88px] h-auto object-contain"
+          />
+        </div>
+        <div className="bg-zinc-50 rounded-xl p-2.5 sm:p-3 border border-zinc-200/80 shadow-lg flex items-center justify-center">
+          <img 
+            src="/images/nmamit-logo.png" 
+            alt="NMAMIT" 
+            className="w-28 sm:w-[124px] h-auto object-contain"
+          />
+        </div>
       </div>
     </main>
   );
