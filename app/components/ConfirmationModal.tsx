@@ -191,12 +191,14 @@ export function ConfirmationModal({
             >
               {tier.title} PROTOCOL
             </h3>
-            <div className="font-mono text-[11px] text-zinc-400 mt-1">
-              Multiplier:{' '}
-              <span className="text-zinc-200">{tier.bountyMultiplier}</span>
-              &nbsp;·&nbsp;Time cap:{' '}
-              <span className="text-zinc-200">{tier.timeLimit}</span>
-            </div>
+            {tier.scoring && (
+              <div className="font-mono text-[11px] text-zinc-400 mt-1">
+                Correct:{' '}
+                <span className="font-bold text-emerald-400">+{tier.scoring.correct}</span>
+                &nbsp;·&nbsp;Wrong:{' '}
+                <span className="font-bold text-rose-500">-{Math.abs(tier.scoring.wrong)}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -216,50 +218,16 @@ export function ConfirmationModal({
           </div>
         </div>
 
-        {/* ── Rules summary (compact) ── */}
-        <div className="mb-4 rounded-lg bg-zinc-950 border border-zinc-800 overflow-hidden">
-          <div className="px-3 pt-2.5 pb-1.5 border-b border-zinc-800 font-mono text-[10px] text-zinc-500 uppercase tracking-wider">
-            PROTOCOL RULES SUMMARY
-          </div>
-          <div className="divide-y divide-zinc-800/70">
-            {tier.rules.map((rule, idx) => (
-              <div key={rule.id} className="px-3 py-2 flex items-baseline gap-2">
-                <span className="font-mono text-[10px] text-rose-500 shrink-0">[{idx + 1}]</span>
-                <div>
-                  <div className="font-mono text-[11px] text-zinc-200 font-semibold">
-                    {rule.title}
-                  </div>
-                  <p className="font-mono text-[10px] text-zinc-500 leading-snug mt-0.5">
-                    {rule.description}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="px-3 py-2 bg-rose-950/20 border-t border-rose-900/40 font-mono text-[10px] text-rose-300">
-            <span className="font-bold text-rose-400 mr-1">PENALTY:</span>
-            {tier.penaltyNotice}
-          </div>
-        </div>
-
-        {/* ── Irrevocable warning ── */}
+        {/* ── Tier-specific confirmation message ── */}
         <div
           id="confirm-modal-desc"
-          className="rounded-lg bg-rose-950/25 border border-rose-900/50 p-3.5 mb-5"
+          className="rounded-lg bg-rose-950/25 border border-rose-900/50 p-4 mb-5"
         >
           <div className="flex items-start gap-3">
             <span className="text-rose-500 text-base shrink-0 mt-px" aria-hidden="true">⚠</span>
             <div>
-              <div className="font-mono text-[11px] font-bold text-rose-400 uppercase tracking-wider">
-                IRREVOCABLE SELECTION NOTICE
-              </div>
-              <p className="text-[11px] text-zinc-300 mt-1.5 leading-relaxed">
-                Once confirmed, this sector assignment{' '}
-                <strong className="text-zinc-100">cannot be reversed</strong> or re-rolled
-                by any squad member. All challenges and penalty curves will run under the{' '}
-                <strong className={accentLabel}>{tier.title}</strong> ruleset for the
-                duration of the event.
-              </p>
+              <p className="text-sm text-zinc-300 leading-relaxed">{tier.confirmMessage}</p>
+              <p className={`mt-3 text-sm font-bold ${accentLabel}`}>{tier.confirmQuestion}</p>
             </div>
           </div>
         </div>

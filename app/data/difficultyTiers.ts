@@ -46,6 +46,9 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     penaltyNotice: 'Penalty decay of 5% per failed compilation after the second attempt.',
     accentColorHex: '#10b981', // emerald 'green light' for circle
     scoring: { correct: 5, wrong: 0 },
+    confirmMessage:
+      "You're about to enter the Easy Trial. Once you confirm your selection, your difficulty is locked and cannot be changed. Choose wisely, and prepare for the challenge ahead.",
+    confirmQuestion: 'Are you sure you want to proceed with Easy?',
   },
   {
     id: 'medium',
@@ -85,6 +88,9 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     penaltyNotice: 'Timeouts cause immediate forfeiture of problem multiplier bonus.',
     accentColorHex: '#f59e0b', // tactical amber/gold for triangle
     scoring: { correct: 20, wrong: -10 },
+    confirmMessage:
+      "You're about to enter the Medium Trial. Think carefully before committing. Once you confirm your selection, your difficulty is locked permanently and cannot be changed.",
+    confirmQuestion: 'Are you sure you want to proceed with Medium?',
   },
   {
     id: 'hard',
@@ -124,6 +130,9 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     penaltyNotice: 'Lethal scoring rule: Failure to clear at least 2 challenges voids all points.',
     accentColorHex: '#e11d48', // intense crimson red for square
     scoring: { correct: 30, wrong: -20 },
+    confirmMessage:
+      "You're about to enter the Hard Trial. There are no second chances when choosing your difficulty. Once confirmed, your selection is final and cannot be changed.",
+    confirmQuestion: 'Are you ready to accept the Hard Trial?',
   },
 ];
 
