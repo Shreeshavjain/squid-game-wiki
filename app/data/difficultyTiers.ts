@@ -21,7 +21,7 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     bountyMultiplier: '1.0× BASE POOL',
     survivalRate: 'EST. SURVIVAL 82%',
     overview:
-      "Enter the arena with a beginner-friendly trial designed to test your fundamentals. Choose a steadier path, minimise mistakes, and build your squad's score.",
+      'Face 10 descriptive questions in a beginner-friendly trial designed to test your fundamentals. Answer every question correctly to secure *50 points*—consistency is the key to survival.',
     targetAudience: 'Recommended for freshmen squads and teams testing coordination.',
     rules: [
       {
@@ -60,7 +60,7 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     bountyMultiplier: '1.75× BASE POOL',
     survivalRate: 'EST. SURVIVAL 49%',
     overview:
-      'Face five multiple-choice questions where every decision counts. Earn +20 points for each correct answer and lose 10 points for every wrong answer.',
+      'Take on 5 multiple-choice questions where every decision matters. Get all five correct to earn *100 points*, but five wrong answers could cost you *50 points*.',
     targetAudience: 'Optimal balance of risk and point payout for battle-tested teams.',
     rules: [
       {
@@ -99,7 +99,7 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     bountyMultiplier: '3.0× MAXIMUM POOL',
     survivalRate: 'EST. SURVIVAL 16%',
     overview:
-      "Step into the most demanding trial, where precision and strategic thinking are essential. One poor decision can cost your squad dearly, so enter only if you're ready to risk it all.",
+      'Face 5 challenging descriptive questions that test your deeper understanding and ability to explain your answers. Score a maximum of *150 points* if all answers are correct, while getting all 5 wrong can bring your score down to *−100 points*. Think carefully before submitting!',
     targetAudience: 'Top-tier squads seeking championship lead with high appetite for risk.',
     rules: [
       {

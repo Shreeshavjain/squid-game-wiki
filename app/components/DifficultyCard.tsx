@@ -73,7 +73,7 @@ export function DifficultyCard({
     <article
       className={[
         'group relative flex flex-col h-full overflow-hidden rounded-2xl',
-        'border p-5 sm:p-6',
+        'border p-5 sm:px-6',
         'transition-[border-color,box-shadow,opacity,filter,transform] duration-300',
         stateClass,
       ].join(' ')}
@@ -112,22 +112,22 @@ export function DifficultyCard({
       </div>
 
       {/* ── Geometric insignia ── */}
-      <div className="relative py-4 flex flex-col items-center">
+      <div className="relative py-3 flex flex-col items-center">
         <div
-          className="absolute top-4 w-16 h-16 rounded-full blur-2xl pointer-events-none"
+          className="absolute top-3 w-14 h-14 rounded-full blur-2xl pointer-events-none"
           style={{ background: accents.glow }}
           aria-hidden="true"
         />
         <div
           className={[
-            'relative w-16 h-16 rounded-full border-2 bg-zinc-950/60 flex items-center justify-center',
+            'relative w-14 h-14 rounded-full border-2 bg-zinc-950/60 flex items-center justify-center',
             'transition-[border-color,transform] duration-300 group-hover:scale-105',
             accents.iconRing,
           ].join(' ')}
         >
           <GeometricIcon
             symbol={tier.symbol}
-            size={34}
+            size={30}
             strokeWidth={3}
             className={`text-zinc-100 transition-colors duration-300 ${accents.iconHover}`}
             glow={tier.id === 'hard'}
@@ -199,8 +199,15 @@ export function DifficultyCard({
       </div>
 
       {/* ── Overview text ── */}
-      <p className="relative mt-4 text-[13px] text-zinc-400 leading-relaxed">
-        {tier.overview}
+      <p className="relative mt-4 text-[13px] text-zinc-400 leading-normal">
+        {/* *text* in the overview renders bold */}
+        {tier.overview.split(/\*(.+?)\*/).map((part, i) =>
+          i % 2 === 1 ? (
+            <strong key={i} className="font-semibold text-zinc-100">{part}</strong>
+          ) : (
+            part
+          )
+        )}
       </p>
 
       {/* ── Action button (pinned to bottom so buttons align across cards) ── */}
