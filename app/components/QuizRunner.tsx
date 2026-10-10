@@ -424,27 +424,37 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRu
                       );
                     })}
                   </ul>
-                ) : Object.values(progress.answers).every((v) => v.length <= 12 && !v.includes('\n')) ? (
-                  <div className="mt-6 grid grid-cols-2 sm:grid-cols-5 gap-2 max-w-xl mx-auto">
-                    {questions.map((q, i) => (
-                      <div key={q.id} className="rounded-lg border border-zinc-700/40 bg-zinc-950/60 px-2 py-2 min-w-0">
-                        <div className="font-mono text-[10px] text-zinc-500">Q{i + 1}</div>
-                        <div className={`font-mono text-sm font-bold truncate ${theme.text}`} title={progress.answers[q.id]}>
-                          {progress.answers[q.id] ?? '—'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 ) : (
-                  <div className="mt-6 space-y-2 text-left">
-                    {questions.map((q, i) => (
-                      <div key={q.id} className="flex gap-3 rounded-lg border border-zinc-700/40 bg-zinc-950/60 px-4 py-3">
-                        <div className={`shrink-0 font-mono text-xs font-bold pt-0.5 ${theme.text}`}>Q{i + 1}</div>
-                        <div className="min-w-0 flex-1 overflow-x-auto font-mono text-sm text-zinc-200 whitespace-pre">
-                          {progress.answers[q.id] ?? '—'}
-                        </div>
-                      </div>
-                    ))}
+                  /* Report for organiser-graded (descriptive) quizzes: each question with the team's full answer */
+                  <div className="mt-8 text-left">
+                    <div className="flex items-center justify-between border-b border-zinc-800 pb-2 mb-3">
+                      <h3 className="font-mono text-[11px] tracking-[0.25em] uppercase text-zinc-400">Your answers</h3>
+                      <span className="font-mono text-[11px] text-zinc-500">{total} questions</span>
+                    </div>
+                    <ol className="space-y-3">
+                      {questions.map((q, i) => (
+                        <li key={q.id} className="rounded-xl border border-zinc-700/40 bg-zinc-950/60 overflow-hidden">
+                          <div className="px-4 pt-3 pb-2.5 border-b border-zinc-800/80">
+                            <div className="flex items-baseline gap-2">
+                              <span className={`font-mono text-xs font-bold ${theme.text}`}>Q{i + 1}</span>
+                              <span className="text-sm font-semibold text-zinc-100">
+                                <QuestionSummary question={q} />
+                              </span>
+                            </div>
+                          </div>
+                          <div className="px-4 py-3">
+                            <div className="font-mono text-[10px] tracking-widest uppercase text-zinc-500 mb-1">Your answer</div>
+                            {progress.answers[q.id] ? (
+                              <div className="overflow-x-auto font-mono text-sm text-zinc-50 whitespace-pre leading-relaxed">
+                                {progress.answers[q.id]}
+                              </div>
+                            ) : (
+                              <div className="text-sm italic text-zinc-500">No answer</div>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
                   </div>
                 )}
               </section>
@@ -760,4 +770,35 @@ function AnswerBox({
       </p>
     </>
   );
+}
+
+// ── Shared: one-line description of a question for reports ──────
+function QuestionSummary({ question }: { question: QuizQuestion }) {
+  switch (question.kind) {
+    case 'emoji':
+      return (
+        <>
+          <span className="mr-1.5">{question.emojis.join(' ')}</span>
+          <span className="font-normal text-zinc-400">· {question.category}</span>
+        </>
+      );
+    case 'unscramble':
+      return (
+        <>
+          <span className="font-mono tracking-[0.3em]">{question.letters.join('')}</span>
+          <span className="font-normal text-zinc-400"> · Unscramble ({question.letters.length} letters)</span>
+        </>
+      );
+    case 'written':
+      return (
+        <>
+          {question.title}
+          <span className="block mt-0.5 font-normal text-zinc-400">
+            <RichText text={question.question} />
+          </span>
+        </>
+      );
+    default:
+      return <>{question.title}</>;
+  }
 }
