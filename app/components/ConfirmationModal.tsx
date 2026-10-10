@@ -93,7 +93,7 @@ export function ConfirmationModal({
   if (!isOpen || !tier) return null;
 
   const accentLabel = {
-    easy: 'text-blue-400',
+    easy: 'text-emerald-400',
     medium: 'text-amber-400',
     hard: 'text-rose-400',
   }[tier.id];

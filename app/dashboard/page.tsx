@@ -30,9 +30,6 @@ function DashboardContent() {
   // Local prototype locked state (tier irrevocably locked in current session)
   const [lockedTier, setLockedTier] = useState<DifficultyTier | null>(null);
 
-  // Explicit tracking for mobile tap-to-expand to allow one or multiple cards expanded
-  const [tapExpandedTierId, setTapExpandedTierId] = useState<string | null>(null);
-
   // Card selection clicked -> opens confirmation modal (DOES NOT LOCK DIRECTLY)
   const handleInitiateSelection = (tier: DifficultyTier) => {
     setSelectedTierForModal(tier);
@@ -62,11 +59,6 @@ function DashboardContent() {
     }));
   };
 
-  // Toggle mobile expansion
-  const handleToggleExpand = (tierId: string) => {
-    setTapExpandedTierId((prev) => (prev === tierId ? null : tierId));
-  };
-
   return (
     <div className="relative min-h-screen flex flex-col justify-between text-zinc-100 overflow-x-hidden">
       {/* 1. Cinematic Architectural Background */}
@@ -80,7 +72,7 @@ function DashboardContent() {
       />
 
       {/* 3. Main Dashboard Workspace */}
-      <main className="relative z-10 flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 flex flex-col items-center">
+      <main className="relative z-10 flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-7 flex flex-col items-center">
         {/* If locked, display top confirmation status banner */}
         {lockedTier && (
           <LockedBanner
@@ -91,34 +83,21 @@ function DashboardContent() {
         )}
 
         {/* Hero Section */}
-        <section className="text-center max-w-3xl mx-auto mb-8 sm:mb-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 text-[11px] font-mono tracking-widest text-zinc-300 uppercase mb-4 shadow-sm" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" aria-hidden="true" />
-            <span>PHASE 01 // SECTOR ALLOCATION PROTOCOL</span>
-          </div>
-
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight uppercase font-sans text-zinc-50 leading-none" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.8)' }}>
+        <section className="text-center max-w-3xl mx-auto mb-6 sm:mb-7">
+          <h2 className="text-4xl sm:text-5xl font-black tracking-tight uppercase font-sans text-zinc-50 leading-none" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.8)' }}>
             CHOOSE YOUR{' '}<span className="text-rose-500">GAME</span>
           </h2>
 
-          <p className="mt-4 text-sm leading-relaxed max-w-2xl mx-auto font-medium" style={{ color: '#F5F2F3', textShadow: '0 2px 8px rgba(0,0,0,0.7)' }}>
+          <p className="mt-3 text-sm leading-relaxed max-w-2xl mx-auto font-medium" style={{ color: '#F5F2F3', textShadow: '0 2px 8px rgba(0,0,0,0.7)' }}>
             Review the three trial sectors. Each tier carries distinct algorithmic constraints,
             strict time caps, and escalating penalty multipliers. Once your squad captain
             confirms, the assignment is locked.
           </p>
-
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] font-mono text-zinc-300 uppercase tracking-widest" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
-            <span>[○] TIER 1: WORKER</span>
-            <span className="text-zinc-500" aria-hidden="true">•</span>
-            <span>[△] TIER 2: SOLDIER</span>
-            <span className="text-zinc-500" aria-hidden="true">•</span>
-            <span>[□] TIER 3: SUPERVISOR</span>
-          </div>
         </section>
 
         <section
           aria-label="Difficulty Selection Cards"
-          className="w-full grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-7 items-start"
+          className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-7 items-stretch"
         >
           {DIFFICULTY_TIERS.map((tier) => (
             <DifficultyCard
@@ -127,19 +106,17 @@ function DashboardContent() {
               isLocked={lockedTier !== null}
               isCurrentLockedTier={lockedTier?.id === tier.id}
               onInitiateSelection={handleInitiateSelection}
-              isForceExpanded={tapExpandedTierId === tier.id}
-              onToggleExpand={() => handleToggleExpand(tier.id)}
             />
           ))}
         </section>
 
         {/* Tactical Event Notice Footer Strip */}
-        <section className="mt-16 w-full max-w-4xl border-t border-zinc-700/30 pt-6 flex flex-col sm:flex-row items-center justify-between text-zinc-500 font-mono text-xs gap-4">
+        <section className="mt-16 w-full max-w-4xl border-t border-zinc-700/30 pt-6 flex flex-col sm:flex-row items-center justify-between text-zinc-400 font-mono text-xs gap-4">
           <div className="flex items-center space-x-2">
             <span className="text-rose-500 font-bold">⚠</span>
             <span>EACH TEAM IS PERMITTED EXACTLY ONE SECTOR ASSIGNMENT</span>
           </div>
-          <div className="text-center sm:text-right text-zinc-600">
+          <div className="text-center sm:text-right text-zinc-500">
             RULES VERSION 1.0 // HOSTED BY TECH-CLUB ADVISORY
           </div>
         </section>

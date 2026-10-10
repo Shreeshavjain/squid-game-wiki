@@ -44,7 +44,7 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
       },
     ],
     penaltyNotice: 'Penalty decay of 5% per failed compilation after the second attempt.',
-    accentColorHex: '#3b82f6', // subtle icy cyan/slate for circle
+    accentColorHex: '#10b981', // emerald 'green light' for circle
   },
   {
     id: 'medium',
@@ -54,7 +54,7 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     symbol: 'triangle',
     guardRole: 'SOLDIER // TRIANGLE',
     riskLevel: 'ELEVATED RISK',
-    riskDescriptor: 'RAPID CLOCK // PUNISHING EDGE-CASES',
+    riskDescriptor: 'MCQ QUESTIONS',
     timeLimit: '35 MINS',
     bountyMultiplier: '1.75× BASE POOL',
     survivalRate: 'EST. SURVIVAL 49%',
@@ -83,6 +83,7 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     ],
     penaltyNotice: 'Timeouts cause immediate forfeiture of problem multiplier bonus.',
     accentColorHex: '#f59e0b', // tactical amber/gold for triangle
+    scoring: { correct: 20, wrong: -10 },
   },
   {
     id: 'hard',

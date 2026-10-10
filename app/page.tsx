@@ -36,18 +36,19 @@ export default function EntryPage() {
         <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
       </div>
 
-      {/* Main Content Group (Logo + Input positioned together) */}
-      <div className="relative z-10 w-full flex flex-col items-center mt-2 sm:mt-6">
-        
-        {/* Squid Game Logo (Standalone, no background card) */}
-        <img 
-          src="/images/squid-game-logo.png" 
-          alt="Squid Game" 
-          className="w-[280px] sm:w-[440px] h-auto object-contain drop-shadow-2xl"
+      {/* Main Content Group: input pinned to the exact vertical center, logo stacked above it */}
+      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-10 flex justify-center px-4">
+        <div className="relative w-full max-w-lg px-2 sm:px-6">
+
+        {/* Squid Game Logo (Standalone, no background card) — the source PNG is square with
+            transparent padding above/below the artwork, so crop to 2:1 to keep it tight to the input */}
+        <img
+          src="/images/squid-game-logo.png"
+          alt="Squid Game"
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 sm:mb-6 w-[min(92vw,380px)] sm:w-[540px] lg:w-[640px] max-w-none aspect-[2/1] object-cover object-center drop-shadow-2xl"
         />
 
         {/* Middle: Single Cohesive UI Component */}
-        <div className="w-full max-w-lg px-2 sm:px-6 mt-6 sm:mt-8">
         <form 
           onSubmit={handleSubmit} 
           className="flex items-center w-full rounded-full p-1.5 transition-all"
@@ -80,27 +81,38 @@ export default function EntryPage() {
           </button>
         </form>
         {error && (
-          <p id="team-name-error" className="mt-4 text-center text-xs font-mono text-rose-400 tracking-wide" role="alert">
+          <p id="team-name-error" className="absolute top-full inset-x-0 mt-4 text-center text-xs font-mono text-rose-400 tracking-wide" role="alert">
             {error}
           </p>
         )}
         </div>
       </div>
 
-      {/* Bottom: Partner Branding with Light Cards */}
-      <div className="relative z-10 w-full flex items-center justify-center gap-4 sm:gap-6 mt-auto pt-8 pb-safe mb-6 sm:mb-10">
-        <div className="bg-zinc-50 rounded-xl p-2.5 sm:p-3 border border-zinc-200/80 shadow-lg flex items-center justify-center">
-          <img 
-            src="/images/wikiclub-logo.png" 
-            alt="WikiClub" 
-            className="w-20 sm:w-[88px] h-auto object-contain"
+      {/* Bottom: Partner Branding in a single glass panel matching the search bar */}
+      <div className="relative z-10 w-full flex flex-col items-center mt-auto pt-8 pb-safe mb-6 sm:mb-10">
+        <p className="mb-3 text-[10px] sm:text-[11px] font-mono uppercase tracking-[0.3em] text-zinc-400">
+          Presented by
+        </p>
+        <div
+          className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 rounded-2xl px-6 py-4 sm:px-8"
+          style={{
+            backgroundColor: 'rgba(20, 20, 26, 0.55)',
+            backdropFilter: 'blur(16px) saturate(1.2)',
+            WebkitBackdropFilter: 'blur(16px) saturate(1.2)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+          }}
+        >
+          <img
+            src="/images/wikiclub-logo-light.png"
+            alt="WikiClub Tech India"
+            className="h-8 sm:h-9 w-auto object-contain"
           />
-        </div>
-        <div className="bg-zinc-50 rounded-xl p-2.5 sm:p-3 border border-zinc-200/80 shadow-lg flex items-center justify-center">
-          <img 
-            src="/images/nmamit-logo.png" 
-            alt="NMAMIT" 
-            className="w-28 sm:w-[124px] h-auto object-contain"
+          <span className="h-px w-16 sm:h-8 sm:w-px bg-white/15" aria-hidden="true" />
+          <img
+            src="/images/nmamit-logo-light.png"
+            alt="NMAM Institute of Technology"
+            className="h-5 sm:h-6 w-auto object-contain"
           />
         </div>
       </div>

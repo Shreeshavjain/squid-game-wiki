@@ -63,6 +63,44 @@ body {
   }
 }
 
+/* ── Arena background animations (ArenaBackground.tsx) ──── */
+@keyframes arena-rise {
+  from {
+    transform: translateY(110vh) rotate(0deg);
+  }
+  to {
+    transform: translateY(-20vh) rotate(360deg);
+  }
+}
+
+@keyframes arena-drift {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(8vw, 6vh) scale(1.15);
+  }
+}
+
+@keyframes arena-scan {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  60% {
+    transform: translateY(100vh);
+    opacity: 1;
+  }
+  61%,
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+
 /* ── Reduced-motion: disable all animations globally ─────── */
 @media (prefers-reduced-motion: reduce) {
   *,

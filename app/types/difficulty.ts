@@ -25,6 +25,11 @@ export interface DifficultyTier {
   readonly rules: readonly ProtocolRule[];
   readonly penaltyNotice: string;
   readonly accentColorHex: string;
+  /** When set, the card shows per-answer scoring instead of time/bounty */
+  readonly scoring?: {
+    readonly correct: number;
+    readonly wrong: number;
+  };
 }
 
 export interface TeamSessionInfo {
