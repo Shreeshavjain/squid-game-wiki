@@ -13,6 +13,7 @@ import { QuizQuestion } from '../types/quiz';
 export const MEDIUM_QUIZ: readonly QuizQuestion[] = [
   {
     id: 'q1',
+    kind: 'mcq',
     section: 'Part 1 · Think carefully (Git & Linux)',
     title: 'Git — Think Carefully',
     context: [
@@ -32,6 +33,7 @@ export const MEDIUM_QUIZ: readonly QuizQuestion[] = [
   },
   {
     id: 'q2',
+    kind: 'mcq',
     section: 'Part 1 · Think carefully (Git & Linux)',
     title: 'Linux — Who Has Access?',
     context: [
@@ -53,6 +55,7 @@ export const MEDIUM_QUIZ: readonly QuizQuestion[] = [
   },
   {
     id: 'q3',
+    kind: 'mcq',
     section: 'Part 2 · GitHub contribution workflow',
     title: 'Contributing a Fix',
     context: [],
@@ -67,6 +70,7 @@ export const MEDIUM_QUIZ: readonly QuizQuestion[] = [
   },
   {
     id: 'q4',
+    kind: 'mcq',
     section: 'Part 3 · Core concepts',
     title: 'CI/CD',
     context: [],
@@ -80,6 +84,7 @@ export const MEDIUM_QUIZ: readonly QuizQuestion[] = [
   },
   {
     id: 'q5',
+    kind: 'mcq',
     section: 'Part 3 · Core concepts',
     title: 'Secure Communication',
     context: [],

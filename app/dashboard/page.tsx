@@ -11,6 +11,11 @@ import { ConfirmationModal } from '../components/ConfirmationModal';
 import { LockedBanner } from '../components/LockedBanner';
 import { getLockedTier, setLockedTier as persistLockedTier } from '../lib/trialStorage';
 
+// Tiers that are played as a quiz on their own page
+const QUIZ_TIERS: readonly DifficultyTier['id'][] = ['easy', 'medium'];
+const quizUrl = (tierId: DifficultyTier['id'], teamName: string) =>
+  `/quiz/${tierId}?${new URLSearchParams({ teamName })}`;
+
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,13 +37,12 @@ function DashboardContent() {
   // Local prototype locked state (tier irrevocably locked in current session)
   const [lockedTier, setLockedTier] = useState<DifficultyTier | null>(null);
 
-  // Medium is played on its own page; replace() keeps the dashboard out of history
-  const quizUrl = `/quiz/medium?${new URLSearchParams({ teamName: session.teamName })}`;
-
-  // A team that already locked Medium can't come back here to pick again
+  // A team that already locked a quiz tier can't come back here to pick again;
+  // replace() keeps the dashboard out of history
   useEffect(() => {
-    if (getLockedTier(session.teamName) === 'medium') router.replace(quizUrl);
-  }, [session.teamName, quizUrl, router]);
+    const locked = getLockedTier(session.teamName);
+    if (locked && QUIZ_TIERS.includes(locked)) router.replace(quizUrl(locked, session.teamName));
+  }, [session.teamName, router]);
 
   // Card selection clicked -> opens confirmation modal (DOES NOT LOCK DIRECTLY)
   const handleInitiateSelection = (tier: DifficultyTier) => {
@@ -52,9 +56,9 @@ function DashboardContent() {
 
   // Explicit confirmation from modal -> Locks choice
   const handleConfirmLock = (tier: DifficultyTier) => {
-    if (tier.id === 'medium') {
-      persistLockedTier(session.teamName, 'medium');
-      router.replace(quizUrl);
+    if (QUIZ_TIERS.includes(tier.id)) {
+      persistLockedTier(session.teamName, tier.id);
+      router.replace(quizUrl(tier.id, session.teamName));
       return;
     }
     setLockedTier(tier);
