@@ -21,7 +21,7 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     bountyMultiplier: '1.0× BASE POOL',
     survivalRate: 'EST. SURVIVAL 82%',
     overview:
-      'Introductory algorithmic and debugging trials designed to assess rapid baseline synchronization and fundamental syntax under pressure.',
+      "Enter the arena with a beginner-friendly trial designed to test your fundamentals. Choose a steadier path, minimise mistakes, and build your squad's score.",
     targetAudience: 'Recommended for freshmen squads and teams testing coordination.',
     rules: [
       {
@@ -60,7 +60,7 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     bountyMultiplier: '1.75× BASE POOL',
     survivalRate: 'EST. SURVIVAL 49%',
     overview:
-      'Intermediate system puzzles demanding tight algorithmic optimizations, strict memory limits, and razor-sharp edge-case handling.',
+      'Face five multiple-choice questions where every decision counts. Earn +20 points for each correct answer and lose 10 points for every wrong answer.',
     targetAudience: 'Optimal balance of risk and point payout for battle-tested teams.',
     rules: [
       {
@@ -99,7 +99,7 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     bountyMultiplier: '3.0× MAXIMUM POOL',
     survivalRate: 'EST. SURVIVAL 16%',
     overview:
-      'High-stress competitive architecture and competitive exploit challenges. A single syntax regression or timeout deducts accumulated squad points.',
+      "Step into the most demanding trial, where precision and strategic thinking are essential. One poor decision can cost your squad dearly, so enter only if you're ready to risk it all.",
     targetAudience: 'Top-tier squads seeking championship lead with high appetite for risk.',
     rules: [
       {

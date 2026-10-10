@@ -72,7 +72,7 @@ function DashboardContent() {
       />
 
       {/* 3. Main Dashboard Workspace */}
-      <main className="relative z-10 flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-7 flex flex-col items-center">
+      <main className="relative z-10 flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col items-center">
         {/* If locked, display top confirmation status banner */}
         {lockedTier && (
           <LockedBanner
@@ -83,7 +83,7 @@ function DashboardContent() {
         )}
 
         {/* Hero Section */}
-        <section className="text-center max-w-3xl mx-auto mb-6 sm:mb-7">
+        <section className="text-center max-w-3xl mx-auto mb-5">
           <h2 className="text-4xl sm:text-5xl font-black tracking-tight uppercase font-sans text-zinc-50 leading-none" style={{ textShadow: '0 4px 20px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.8)' }}>
             CHOOSE YOUR{' '}<span className="text-rose-500">GAME</span>
           </h2>
