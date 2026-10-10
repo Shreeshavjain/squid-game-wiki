@@ -94,7 +94,7 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     symbol: 'square',
     guardRole: 'SUPERVISOR // SQUARE',
     riskLevel: 'CRITICAL RISK',
-    riskDescriptor: 'ZERO TOLERANCE // SUDDEN DEATH ELIMINATION',
+    riskDescriptor: 'DESCRIPTIVE ANSWERS',
     timeLimit: '25 MINS',
     bountyMultiplier: '3.0× MAXIMUM POOL',
     survivalRate: 'EST. SURVIVAL 16%',
@@ -123,6 +123,7 @@ export const DIFFICULTY_TIERS: readonly DifficultyTier[] = [
     ],
     penaltyNotice: 'Lethal scoring rule: Failure to clear at least 2 challenges voids all points.',
     accentColorHex: '#e11d48', // intense crimson red for square
+    scoring: { correct: 30, wrong: -20 },
   },
 ];
 
