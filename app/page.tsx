@@ -16,6 +16,14 @@ export default function EntryPage() {
       return;
     }
     
+    // Enroll the team in the database; keepalive lets it finish across the navigation
+    fetch('/api/teams', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamName: trimmedName }),
+      keepalive: true,
+    }).catch(() => {});
+
     const params = new URLSearchParams();
     params.set('teamName', trimmedName);
     

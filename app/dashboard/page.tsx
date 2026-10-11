@@ -58,6 +58,13 @@ function DashboardContent() {
   const handleConfirmLock = (tier: DifficultyTier) => {
     if (QUIZ_TIERS.includes(tier.id)) {
       persistLockedTier(session.teamName, tier.id);
+      // Record the choice in the database; the final quiz submit records it too if this fails
+      fetch('/api/teams/lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamName: session.teamName, difficulty: tier.id }),
+        keepalive: true,
+      }).catch(() => {});
       router.replace(quizUrl(tier.id, session.teamName));
       return;
     }

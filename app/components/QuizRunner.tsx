@@ -168,25 +168,23 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRu
       return;
     }
 
-    // Final submit: auto-scored quizzes are graded on the server before finishing
+    // Final submit: saved on the server (and graded there, for auto-scored quizzes) before finishing
     let result: Pick<QuizProgress, 'score' | 'maxScore' | 'results'> | null = null;
-    if (scoreEndpoint) {
-      setIsScoring(true);
-      setScoreError(false);
-      try {
-        const res = await fetch(scoreEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answers }),
-        });
-        if (!res.ok) throw new Error(`Scoring failed: ${res.status}`);
-        result = await res.json();
-      } catch {
-        setScoreError(true);
-        return;
-      } finally {
-        setIsScoring(false);
-      }
+    setIsScoring(true);
+    setScoreError(false);
+    try {
+      const res = await fetch(scoreEndpoint ?? '/api/quiz/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamName, tier: tier.id, answers }),
+      });
+      if (!res.ok) throw new Error(`Submit failed: ${res.status}`);
+      if (scoreEndpoint) result = await res.json();
+    } catch {
+      setScoreError(true);
+      return;
+    } finally {
+      setIsScoring(false);
     }
     commit({ ...progress, answers, completed: true, ...result });
   };
@@ -333,7 +331,7 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRu
                         : 'cursor-not-allowed bg-zinc-900/60 text-zinc-600 border border-zinc-800',
                     ].join(' ')}
                   >
-                    {isScoring ? 'Calculating…' : isLast ? 'Submit' : 'Next →'}
+                    {isScoring ? (scoreEndpoint ? 'Calculating…' : 'Submitting…') : isLast ? 'Submit' : 'Next →'}
                   </button>
                 </div>
                 {scoreError && (
