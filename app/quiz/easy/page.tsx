@@ -14,6 +14,8 @@ export default function EasyQuizPage() {
         tier={{ ...EASY_TIER, id: 'easy' }}
         quizTitle="Open Source Buzzwords Challenge"
         questions={EASY_QUIZ}
+        scoreEndpoint="/api/quiz/easy/score"
+        allowSkip
       />
     </Suspense>
   );

@@ -92,9 +92,11 @@ interface QuizRunnerProps {
    * never reaches the browser). Omit for quizzes graded by the organisers.
    */
   scoreEndpoint?: string;
+  /** Show a Skip button; a skipped question is saved as an empty answer */
+  allowSkip?: boolean;
 }
 
-export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRunnerProps) {
+export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint, allowSkip }: QuizRunnerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const teamName = searchParams.get('teamName') || DEFAULT_TEAM_SESSION.teamName;
@@ -137,8 +139,9 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRu
   const value = draft ?? (question && progress?.answers[question.id]) ?? '';
   const answer = value.trim();
 
-  // Questions can be revisited up to (and including) the first unanswered one
-  const firstUnanswered = progress ? questions.findIndex((q) => !progress.answers[q.id]) : -1;
+  // Questions can be revisited up to (and including) the first unanswered one.
+  // A skipped question is stored as '' — passed, but not answered.
+  const firstUnanswered = progress ? questions.findIndex((q) => !(q.id in progress.answers)) : -1;
   const furthestReachable = firstUnanswered === -1 ? total - 1 : firstUnanswered;
 
   const commit = (next: QuizProgress) => {
@@ -155,12 +158,12 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRu
   const [isScoring, setIsScoring] = useState(false);
   const [scoreError, setScoreError] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!progress || !question || !answer || isScoring) return;
+  const advance = async (given: string) => {
+    if (!progress || !question || isScoring) return;
     const answers = {
       ...progress.answers,
       // Unscramble input is displayed uppercase, so store it the way the team saw it
-      [question.id]: question.kind === 'unscramble' ? answer.toUpperCase() : answer,
+      [question.id]: question.kind === 'unscramble' ? given.toUpperCase() : given,
     };
 
     if (!isLast) {
@@ -188,6 +191,11 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRu
     }
     commit({ ...progress, answers, completed: true, ...result });
   };
+
+  const handleSubmit = () => {
+    if (answer) advance(answer);
+  };
+  const handleSkip = () => advance('');
 
   return (
     <div className="relative min-h-screen flex flex-col text-zinc-100 overflow-x-hidden">
@@ -218,7 +226,7 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRu
                 <span>
                   {progress.completed ? 'All questions answered' : `Question ${progress.current + 1} of ${total}`}
                 </span>
-                <span>{Object.keys(progress.answers).length} / {total} answered</span>
+                <span>{Object.values(progress.answers).filter(Boolean).length} / {total} answered</span>
               </div>
               {/* Segments double as navigation back to any reachable question */}
               <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}>
@@ -318,21 +326,40 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRu
                   >
                     ← Previous
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={!answer || isScoring}
-                    className={[
-                      'px-6 py-3 rounded-full font-mono text-xs uppercase tracking-widest font-bold transition-all duration-200',
-                      'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black',
-                      theme.ring,
-                      answer
-                        ? `cursor-pointer ${theme.button}`
-                        : 'cursor-not-allowed bg-zinc-900/60 text-zinc-600 border border-zinc-800',
-                    ].join(' ')}
-                  >
-                    {isScoring ? (scoreEndpoint ? 'Calculating…' : 'Submitting…') : isLast ? 'Submit' : 'Next →'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {allowSkip && (
+                      <button
+                        type="button"
+                        onClick={handleSkip}
+                        disabled={isScoring}
+                        className={[
+                          'px-5 py-3 rounded-full font-mono text-xs uppercase tracking-widest border transition-colors duration-150',
+                          'focus:outline-none focus-visible:ring-2',
+                          theme.ring,
+                          isScoring
+                            ? 'cursor-not-allowed border-zinc-800 text-zinc-600'
+                            : 'cursor-pointer border-zinc-700 text-zinc-300 hover:text-zinc-50 hover:border-zinc-500',
+                        ].join(' ')}
+                      >
+                        Skip
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleSubmit}
+                      disabled={!answer || isScoring}
+                      className={[
+                        'px-6 py-3 rounded-full font-mono text-xs uppercase tracking-widest font-bold transition-all duration-200',
+                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black',
+                        theme.ring,
+                        answer
+                          ? `cursor-pointer ${theme.button}`
+                          : 'cursor-not-allowed bg-zinc-900/60 text-zinc-600 border border-zinc-800',
+                      ].join(' ')}
+                    >
+                      {isScoring ? (scoreEndpoint ? 'Calculating…' : 'Submitting…') : isLast ? 'Submit' : 'Next →'}
+                    </button>
+                  </div>
                 </div>
                 {scoreError && (
                   <p role="alert" className="mt-3 text-right font-mono text-[11px] text-rose-400">
@@ -381,23 +408,24 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRu
                     {questions.map((q, i) => {
                       const result = progress.results?.[q.id];
                       const picked = progress.answers[q.id];
+                      const outcome = result?.skipped ? 'skipped' : result?.correct ? 'correct' : 'wrong';
                       const optionText = q.kind === 'mcq' ? q.options.find((o) => o.key === picked)?.text : undefined;
                       return (
                         <li
                           key={q.id}
                           className={[
                             'flex items-center gap-3 rounded-lg border px-4 py-3',
-                            result?.correct ? 'border-emerald-500/30 bg-emerald-950/20' : 'border-rose-500/30 bg-rose-950/20',
+                            OUTCOME_STYLES[outcome].row,
                           ].join(' ')}
                         >
                           <span
                             className={[
                               'shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold',
-                              result?.correct ? 'bg-emerald-400 text-zinc-950' : 'bg-rose-500 text-white',
+                              OUTCOME_STYLES[outcome].badge,
                             ].join(' ')}
-                            aria-label={result?.correct ? 'Correct' : 'Wrong'}
+                            aria-label={OUTCOME_STYLES[outcome].label}
                           >
-                            {result?.correct ? '✓' : '✗'}
+                            {OUTCOME_STYLES[outcome].icon}
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">
@@ -405,7 +433,11 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRu
                               {q.kind === 'mcq' || q.kind === 'written' ? ` · ${q.title}` : ''}
                             </div>
                             <div className="mt-0.5 text-sm text-zinc-200 truncate">
-                              <span className="font-mono font-bold text-zinc-50">{picked ?? '—'}</span>
+                              {picked ? (
+                                <span className="font-mono font-bold text-zinc-50">{picked}</span>
+                              ) : (
+                                <span className="italic text-zinc-500">Skipped</span>
+                              )}
                               {optionText && (
                                 <span className="text-zinc-400">
                                   {' '}· <RichText text={optionText} />
@@ -414,7 +446,7 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRu
                             </div>
                           </div>
                           <span
-                            className={`shrink-0 font-mono text-base font-black tabular-nums ${result?.correct ? 'text-emerald-400' : 'text-rose-500'}`}
+                            className={`shrink-0 font-mono text-base font-black tabular-nums ${OUTCOME_STYLES[outcome].points}`}
                           >
                             {result && result.points > 0 ? `+${result.points}` : result?.points}
                           </span>
@@ -463,6 +495,30 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint }: QuizRu
     </div>
   );
 }
+
+const OUTCOME_STYLES = {
+  correct: {
+    label: 'Correct',
+    icon: '✓',
+    row: 'border-emerald-500/30 bg-emerald-950/20',
+    badge: 'bg-emerald-400 text-zinc-950',
+    points: 'text-emerald-400',
+  },
+  wrong: {
+    label: 'Wrong',
+    icon: '✗',
+    row: 'border-rose-500/30 bg-rose-950/20',
+    badge: 'bg-rose-500 text-white',
+    points: 'text-rose-500',
+  },
+  skipped: {
+    label: 'Skipped',
+    icon: '–',
+    row: 'border-zinc-700/50 bg-zinc-950/40',
+    badge: 'bg-zinc-700 text-zinc-200',
+    points: 'text-zinc-400',
+  },
+} as const;
 
 // ── Multiple choice ─────────────────────────────────────────────
 function McqBody({

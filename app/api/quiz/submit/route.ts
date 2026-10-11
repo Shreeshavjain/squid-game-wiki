@@ -1,11 +1,11 @@
 import { recordSubmission } from '../../../lib/server/db';
 
 // Tiers without an answer key — graded by hand, so only the answers are stored
-const MANUAL_TIERS = ['easy', 'hard'] as const;
+const MANUAL_TIERS = ['hard'] as const;
 
 /**
  * POST /api/quiz/submit
- * Body: { teamName: 'Red Light', tier: 'easy' | 'hard', answers: { q1: '...', ... } }
+ * Body: { teamName: 'Red Light', tier: 'hard', answers: { q1: '...', ... } }
  *
  * Saves a manually graded quiz's final answers; the score stays null until graded.
  */
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     answers === null
   ) {
     return Response.json(
-      { error: "Expected { teamName: string, tier: 'easy' | 'hard', answers: { [questionId]: string } }" },
+      { error: "Expected { teamName: string, tier: 'hard', answers: { [questionId]: string } }" },
       { status: 400 }
     );
   }
