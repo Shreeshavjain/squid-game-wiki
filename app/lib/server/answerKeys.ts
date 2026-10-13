@@ -49,6 +49,18 @@ export const EASY_ANSWER_KEY: Readonly<Record<string, readonly string[]>> = {
  */
 export const HARD_QUESTION_IDS = ['q1', 'q2', 'q3', 'q4', 'q5'] as const;
 
+/**
+ * Human-readable model answers for each Hard question.
+ * Shown on the results page so organisers can compare against the team's answer.
+ */
+export const HARD_MODEL_ANSWERS: Readonly<Record<string, string>> = {
+  q1: '(a) Java, (b) Ruby, (c) Go, (d) Swift, (e) Perl',
+  q2: 'Linus Torvalds; Creations: Linux (operating system kernel) and Git (version control)',
+  q3: 'Turn switch 1 on and wait ~10 minutes. Turn switch 1 off, then turn switch 2 on. Enter the room: the bulb that is ON → Switch 2; the bulb that is OFF but warm → Switch 1; the bulb that is OFF and cold → Switch 3.',
+  q4: 'Bug 1: low = mid and high = mid should be low = mid + 1 and high = mid - 1 (otherwise infinite loop).\nBug 2: while low < high should be while low <= high (otherwise the last element is never checked).\nInput that hangs: binary_search([1, 3, 5, 7], 7)\nInput with wrong answer: binary_search([5], 5)',
+  q5: 'MIT → B (short and permissive, copyright notice only)\nGPL v3 → C (copyleft, derivatives must also be GPL)\nApache 2.0 → D (permissive with explicit patent grant)\nAGPL → A (network service must share source)',
+};
+
 export function evaluateHardAnswer(id: string, rawAnswer: string): { correct: boolean; skipped?: boolean } {
   const answer = rawAnswer.trim().toLowerCase();
   if (!answer) {

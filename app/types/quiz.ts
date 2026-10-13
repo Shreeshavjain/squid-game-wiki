@@ -79,5 +79,7 @@ export interface QuizProgress {
   score?: number;
   maxScore?: number;
   /** Per-question outcome from the server (never includes the correct option) */
-  results?: Record<string, { correct: boolean; points: number; skipped?: boolean }>;
+  results?: Record<string, { correct: boolean; points: number; skipped?: boolean; needsReview?: boolean; reviewReason?: string }>;
+  /** Model answers for display on the results page (Hard only) */
+  modelAnswers?: Record<string, string>;
 }

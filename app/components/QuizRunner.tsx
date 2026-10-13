@@ -8,7 +8,7 @@ import { QuizContextBlock, QuizProgress, QuizQuestion } from '../types/quiz';
 import { ArenaBackground } from './ArenaBackground';
 import { Header } from './Header';
 import { RichText } from './RichText';
-import { getLockedTier, getQuizProgress, saveQuizProgress } from '../lib/trialStorage';
+import { getLockedTier, setLockedTier, getQuizProgress, saveQuizProgress } from '../lib/trialStorage';
 
 /**
  * QUIZ RUNNER
@@ -113,10 +113,38 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint, allowSki
   // Unsaved edit for the question on screen; null = show its saved answer
   const [draft, setDraft] = useState<string | null>(null);
 
+  const total = questions.length;
+
   // Only teams that locked this tier may be here; for them, trap the browser
   // back button by re-pushing the current entry whenever it's popped
   useEffect(() => {
     if (getLockedTier(teamName) !== tier.id) {
+      if (tier.id === 'hard') {
+        fetch(`/api/quiz/hard/results?teamName=${encodeURIComponent(teamName)}`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data?.results) {
+              setLockedTier(teamName, tier.id);
+              const restored: QuizProgress = {
+                current: total - 1,
+                completed: true,
+                answers: data.answers ?? {},
+                score: data.score,
+                maxScore: data.maxScore,
+                results: data.results,
+                modelAnswers: data.modelAnswers,
+              };
+              saveQuizProgress(teamName, tier.id, restored);
+              setProgress(restored);
+              return;
+            }
+            router.replace(`/dashboard?${new URLSearchParams({ teamName })}`);
+          })
+          .catch(() => {
+            router.replace(`/dashboard?${new URLSearchParams({ teamName })}`);
+          });
+        return;
+      }
       router.replace(`/dashboard?${new URLSearchParams({ teamName })}`);
       return;
     }
@@ -124,7 +152,7 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint, allowSki
     const handlePopState = () => window.history.pushState(null, '', window.location.href);
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [teamName, tier.id, router]);
+  }, [teamName, tier.id, router, total]);
 
   const session = {
     teamId: DEFAULT_TEAM_SESSION.teamId,
@@ -133,7 +161,6 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint, allowSki
     arenaStatus: 'LOCKED' as const,
   };
 
-  const total = questions.length;
   const question = progress && !progress.completed ? questions[progress.current] : null;
   const isLast = progress?.current === total - 1;
   const value = draft ?? (question && progress?.answers[question.id]) ?? '';
@@ -172,7 +199,7 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint, allowSki
     }
 
     // Final submit: saved on the server (and graded there, for auto-scored quizzes) before finishing
-    let result: Pick<QuizProgress, 'score' | 'maxScore' | 'results'> | null = null;
+    let result: Pick<QuizProgress, 'score' | 'maxScore' | 'results' | 'modelAnswers'> | null = null;
     setIsScoring(true);
     setScoreError(false);
     try {
@@ -367,132 +394,635 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint, allowSki
                   </p>
                 )}
               </section>
+            ) : tier.id === 'hard' ? (
+              /* ── Hard Quiz Completion & Organizer Results ── */
+              <HardResultsSection
+                progress={progress}
+                questions={questions}
+                teamName={teamName}
+                theme={theme}
+                total={total}
+                glassStyle={glassStyle}
+                onUpdateProgress={commit}
+              />
             ) : (
-              /* ── Completion ── */
-              <section
-                className="relative overflow-hidden rounded-2xl border border-emerald-400/25 p-8 sm:p-10 text-center motion-safe:animate-[modal-in_260ms_ease-out_both]"
-                style={glassStyle}
-              >
-                <div className="mx-auto w-14 h-14 rounded-full border-2 border-emerald-400/60 flex items-center justify-center text-emerald-400 text-2xl">
-                  ✓
-                </div>
-                <h2 className="mt-4 text-2xl sm:text-3xl font-black tracking-tight text-zinc-50 uppercase">
-                  Trial complete
-                </h2>
-                {progress.score !== undefined ? (
-                  <>
-                    <p className="mt-3 text-sm text-zinc-300 leading-relaxed max-w-md mx-auto">
-                      All {total} answers from <strong className="text-zinc-100">{teamName}</strong> have been submitted.
-                    </p>
-                    <div className="mt-6 inline-flex flex-col items-center rounded-2xl border border-zinc-700/50 bg-zinc-950/60 px-10 py-5">
-                      <span className="font-mono text-[10px] tracking-[0.3em] uppercase text-zinc-500">Your score</span>
-                      <span
-                        className={`mt-1 text-5xl font-black tabular-nums ${progress.score >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}
-                      >
-                        {progress.score}
-                      </span>
-                      <span className="mt-1 font-mono text-xs text-zinc-500">out of {progress.maxScore}</span>
-                    </div>
-                  </>
-                ) : (
-                  <p className="mt-3 text-sm text-zinc-300 leading-relaxed max-w-md mx-auto">
-                    All {total} answers from <strong className="text-zinc-100">{teamName}</strong> have been
-                    locked in. Results will be announced by the organisers.
-                  </p>
-                )}
-
-                {/* Auto-scored: each answer with ✓/✗ and its points. Otherwise short
-                    answers (single words) fit in tiles and long ones are listed in full. */}
-                {progress.results ? (
-                  <ul className="mt-6 space-y-2 text-left">
-                    {questions.map((q, i) => {
-                      const result = progress.results?.[q.id];
-                      const picked = progress.answers[q.id];
-                      const outcome = result?.skipped ? 'skipped' : result?.correct ? 'correct' : 'wrong';
-                      const optionText = q.kind === 'mcq' ? q.options.find((o) => o.key === picked)?.text : undefined;
-                      return (
-                        <li
-                          key={q.id}
-                          className={[
-                            'flex items-center gap-3 rounded-lg border px-4 py-3',
-                            OUTCOME_STYLES[outcome].row,
-                          ].join(' ')}
-                        >
-                          <span
-                            className={[
-                              'shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold',
-                              OUTCOME_STYLES[outcome].badge,
-                            ].join(' ')}
-                            aria-label={OUTCOME_STYLES[outcome].label}
-                          >
-                            {OUTCOME_STYLES[outcome].icon}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">
-                              Q{i + 1}
-                              {q.kind === 'mcq' || q.kind === 'written' ? ` · ${q.title}` : ''}
-                            </div>
-                            <div className="mt-0.5 text-sm text-zinc-200 truncate">
-                              {picked ? (
-                                <span className="font-mono font-bold text-zinc-50">{picked.replace(/\n+/g, ' · ')}</span>
-                              ) : (
-                                <span className="italic text-zinc-500">Skipped</span>
-                              )}
-                              {optionText && (
-                                <span className="text-zinc-400">
-                                  {' '}· <RichText text={optionText} />
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <span
-                            className={`shrink-0 font-mono text-base font-black tabular-nums ${OUTCOME_STYLES[outcome].points}`}
-                          >
-                            {result && result.points > 0 ? `+${result.points}` : result?.points}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  /* Report for organiser-graded (descriptive) quizzes: each question with the team's full answer */
-                  <div className="mt-8 text-left">
-                    <div className="flex items-center justify-between border-b border-zinc-800 pb-2 mb-3">
-                      <h3 className="font-mono text-[11px] tracking-[0.25em] uppercase text-zinc-400">Your answers</h3>
-                      <span className="font-mono text-[11px] text-zinc-500">{total} questions</span>
-                    </div>
-                    <ol className="space-y-3">
-                      {questions.map((q, i) => (
-                        <li key={q.id} className="rounded-xl border border-zinc-700/40 bg-zinc-950/60 overflow-hidden">
-                          <div className="px-4 pt-3 pb-2.5 border-b border-zinc-800/80">
-                            <div className="flex items-baseline gap-2">
-                              <span className={`font-mono text-xs font-bold ${theme.text}`}>Q{i + 1}</span>
-                              <span className="text-sm font-semibold text-zinc-100">
-                                <QuestionSummary question={q} />
-                              </span>
-                            </div>
-                          </div>
-                          <div className="px-4 py-3">
-                            <div className="font-mono text-[10px] tracking-widest uppercase text-zinc-500 mb-1">Your answer</div>
-                            {progress.answers[q.id] ? (
-                              <div className="overflow-x-auto font-mono text-sm text-zinc-50 whitespace-pre leading-relaxed">
-                                {progress.answers[q.id]}
-                              </div>
-                            ) : (
-                              <div className="text-sm italic text-zinc-500">No answer</div>
-                            )}
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                )}
-              </section>
+              /* ── Standard Completion (Easy & Medium) ── */
+              <StandardResultsSection
+                progress={progress}
+                questions={questions}
+                teamName={teamName}
+                theme={theme}
+                total={total}
+                glassStyle={glassStyle}
+              />
             )}
           </>
         )}
       </main>
     </div>
+  );
+}
+
+function StandardResultsSection({
+  progress,
+  questions,
+  teamName,
+  theme,
+  total,
+  glassStyle,
+}: {
+  progress: QuizProgress;
+  questions: readonly QuizQuestion[];
+  teamName: string;
+  theme: QuizTheme;
+  total: number;
+  glassStyle: React.CSSProperties;
+}) {
+  return (
+    <section
+      className="relative overflow-hidden rounded-2xl border border-emerald-400/25 p-8 sm:p-10 text-center motion-safe:animate-[modal-in_260ms_ease-out_both]"
+      style={glassStyle}
+    >
+      <div className="mx-auto w-14 h-14 rounded-full border-2 border-emerald-400/60 flex items-center justify-center text-emerald-400 text-2xl">
+        ✓
+      </div>
+      <h2 className="mt-4 text-2xl sm:text-3xl font-black tracking-tight text-zinc-50 uppercase">
+        Trial complete
+      </h2>
+      {progress.score !== undefined ? (
+        <>
+          <p className="mt-3 text-sm text-zinc-300 leading-relaxed max-w-md mx-auto">
+            All {total} answers from <strong className="text-zinc-100">{teamName}</strong> have been submitted.
+          </p>
+          <div className="mt-6 inline-flex flex-col items-center rounded-2xl border border-zinc-700/50 bg-zinc-950/60 px-10 py-5">
+            <span className="font-mono text-[10px] tracking-[0.3em] uppercase text-zinc-500">Your score</span>
+            <span
+              className={`mt-1 text-5xl font-black tabular-nums ${progress.score >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}
+            >
+              {progress.score}
+            </span>
+            <span className="mt-1 font-mono text-xs text-zinc-500">out of {progress.maxScore}</span>
+          </div>
+        </>
+      ) : (
+        <p className="mt-3 text-sm text-zinc-300 leading-relaxed max-w-md mx-auto">
+          All {total} answers from <strong className="text-zinc-100">{teamName}</strong> have been
+          locked in. Results will be announced by the organisers.
+        </p>
+      )}
+
+      {/* Auto-scored: each answer with ✓/✗ and its points */}
+      {progress.results ? (
+        <ul className="mt-6 space-y-2 text-left">
+          {questions.map((q, i) => {
+            const result = progress.results?.[q.id];
+            const picked = progress.answers[q.id];
+            const outcome = result?.skipped ? 'skipped' : result?.correct ? 'correct' : 'wrong';
+            const optionText = q.kind === 'mcq' ? q.options.find((o) => o.key === picked)?.text : undefined;
+            return (
+              <li
+                key={q.id}
+                className={[
+                  'flex items-center gap-3 rounded-lg border px-4 py-3',
+                  OUTCOME_STYLES[outcome].row,
+                ].join(' ')}
+              >
+                <span
+                  className={[
+                    'shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold',
+                    OUTCOME_STYLES[outcome].badge,
+                  ].join(' ')}
+                  aria-label={OUTCOME_STYLES[outcome].label}
+                >
+                  {OUTCOME_STYLES[outcome].icon}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+                    Q{i + 1}
+                    {q.kind === 'mcq' || q.kind === 'written' ? ` · ${q.title}` : ''}
+                  </div>
+                  <div className="mt-0.5 text-sm text-zinc-200 truncate">
+                    {picked ? (
+                      <span className="font-mono font-bold text-zinc-50">{picked.replace(/\n+/g, ' · ')}</span>
+                    ) : (
+                      <span className="italic text-zinc-500">Skipped</span>
+                    )}
+                    {optionText && (
+                      <span className="text-zinc-400">
+                        {' '}· <RichText text={optionText} />
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span
+                  className={`shrink-0 font-mono text-base font-black tabular-nums ${OUTCOME_STYLES[outcome].points}`}
+                >
+                  {result && result.points > 0 ? `+${result.points}` : result?.points}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <div className="mt-8 text-left">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-2 mb-3">
+            <h3 className="font-mono text-[11px] tracking-[0.25em] uppercase text-zinc-400">Your answers</h3>
+            <span className="font-mono text-[11px] text-zinc-500">{total} questions</span>
+          </div>
+          <ol className="space-y-3">
+            {questions.map((q, i) => (
+              <li key={q.id} className="rounded-xl border border-zinc-700/40 bg-zinc-950/60 overflow-hidden">
+                <div className="px-4 pt-3 pb-2.5 border-b border-zinc-800/80">
+                  <div className="flex items-baseline gap-2">
+                    <span className={`font-mono text-xs font-bold ${theme.text}`}>Q{i + 1}</span>
+                    <span className="text-sm font-semibold text-zinc-100">
+                      <QuestionSummary question={q} />
+                    </span>
+                  </div>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="font-mono text-[10px] tracking-widest uppercase text-zinc-500 mb-1">Your answer</div>
+                  {progress.answers[q.id] ? (
+                    <div className="overflow-x-auto font-mono text-sm text-zinc-50 whitespace-pre leading-relaxed">
+                      {progress.answers[q.id]}
+                    </div>
+                  ) : (
+                    <div className="text-sm italic text-zinc-500">No answer</div>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function HardResultsSection({
+  progress,
+  questions,
+  teamName,
+  theme,
+  total,
+  glassStyle,
+  onUpdateProgress,
+}: {
+  progress: QuizProgress;
+  questions: readonly QuizQuestion[];
+  teamName: string;
+  theme: QuizTheme;
+  total: number;
+  glassStyle: React.CSSProperties;
+  onUpdateProgress?: (next: QuizProgress) => void;
+}) {
+  const currentProgress = progress;
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Organizer mode state
+  const [showOrganizerPanel, setShowOrganizerPanel] = useState(false);
+  const [organizerKey, setOrganizerKey] = useState('');
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isCheckingKey, setIsCheckingKey] = useState(false);
+
+  // Per-question point editing state
+  const [editingPoints, setEditingPoints] = useState<Record<string, string>>({});
+  const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{ qid: string; ok: boolean; msg: string } | null>(null);
+
+  const progressRef = React.useRef(progress);
+  useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
+
+  const onUpdateProgressRef = React.useRef(onUpdateProgress);
+  useEffect(() => {
+    onUpdateProgressRef.current = onUpdateProgress;
+  }, [onUpdateProgress]);
+
+  // Fetch latest authoritative results from server on mount / refresh
+  useEffect(() => {
+    let active = true;
+    const fetchLatest = async () => {
+      try {
+        setIsRefreshing(true);
+        const res = await fetch(`/api/quiz/hard/results?teamName=${encodeURIComponent(teamName)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active && data) {
+          const current = progressRef.current;
+          const updated: QuizProgress = {
+            ...current,
+            answers: data.answers ?? current.answers,
+            score: typeof data.score === 'number' ? data.score : current.score,
+            maxScore: typeof data.maxScore === 'number' ? data.maxScore : current.maxScore,
+            results: data.results ?? current.results,
+            modelAnswers: data.modelAnswers ?? current.modelAnswers,
+          };
+          onUpdateProgressRef.current?.(updated);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch hard results from server:', err);
+      } finally {
+        if (active) setIsRefreshing(false);
+      }
+    };
+    fetchLatest();
+    return () => {
+      active = false;
+    };
+  }, [teamName]);
+
+  const handleVerifyOrganizerKey = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!organizerKey.trim()) {
+      setAuthError('Please enter the organizer passphrase');
+      return;
+    }
+    setIsCheckingKey(true);
+    setAuthError(null);
+    try {
+      const res = await fetch('/api/quiz/hard/correct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', organizerKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAuthError(data.error || 'Invalid organizer key');
+        setIsAuthorized(false);
+      } else {
+        setIsAuthorized(true);
+        setAuthError(null);
+      }
+    } catch {
+      setAuthError('Connection error verifying organizer key');
+    } finally {
+      setIsCheckingKey(false);
+    }
+  };
+
+  const handleSaveCorrection = async (questionId: string) => {
+    const rawVal = editingPoints[questionId];
+    if (rawVal === undefined || rawVal.trim() === '') {
+      setStatusMessage({ qid: questionId, ok: false, msg: 'Please enter points' });
+      return;
+    }
+    const pointsNum = Number(rawVal);
+    if (!Number.isFinite(pointsNum)) {
+      setStatusMessage({ qid: questionId, ok: false, msg: 'Invalid number' });
+      return;
+    }
+
+    setSavingQuestionId(questionId);
+    setStatusMessage(null);
+    try {
+      const res = await fetch('/api/quiz/hard/correct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teamName,
+          questionId,
+          correctedPoints: pointsNum,
+          organizerKey,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStatusMessage({ qid: questionId, ok: false, msg: data.error || 'Failed to save' });
+        if (res.status === 403) {
+          setIsAuthorized(false);
+          setAuthError('Organizer authorization failed. Please re-enter passphrase.');
+        }
+      } else {
+        const prevResults = currentProgress.results ?? {};
+        const updatedResults = {
+          ...prevResults,
+          [questionId]: {
+            ...prevResults[questionId],
+            points: pointsNum,
+            correct: pointsNum > 0,
+            skipped: false,
+            needsReview: false,
+          },
+        };
+        const updated: QuizProgress = {
+          ...currentProgress,
+          score: data.newScore,
+          results: updatedResults,
+        };
+        onUpdateProgress?.(updated);
+        setStatusMessage({
+          qid: questionId,
+          ok: true,
+          msg: `Score updated: ${pointsNum >= 0 ? `+${pointsNum}` : pointsNum} pts (New total: ${data.newScore})`,
+        });
+      }
+    } catch {
+      setStatusMessage({ qid: questionId, ok: false, msg: 'Network error saving correction' });
+    } finally {
+      setSavingQuestionId(null);
+    }
+  };
+
+  return (
+    <section
+      className="relative overflow-hidden rounded-2xl border border-rose-500/30 p-6 sm:p-10 text-center motion-safe:animate-[modal-in_260ms_ease-out_both]"
+      style={glassStyle}
+    >
+      {/* Header icon */}
+      <div className="mx-auto w-14 h-14 rounded-full border-2 border-rose-500/70 flex items-center justify-center text-rose-400 text-2xl shadow-[0_0_20px_rgba(244,63,94,0.3)]">
+        ✓
+      </div>
+      <h2 className="mt-4 text-2xl sm:text-3xl font-black tracking-tight text-zinc-50 uppercase">
+        Hard Trial Complete
+      </h2>
+      <p className="mt-2 text-sm text-zinc-300 leading-relaxed max-w-lg mx-auto">
+        All {total} answers from <strong className="text-zinc-100">{teamName}</strong> have been evaluated by Kusal Sir&apos;s automatic scoring system.
+      </p>
+
+      {/* Score Box */}
+      <div className="mt-6 inline-flex flex-col items-center rounded-2xl border border-rose-500/40 bg-zinc-950/80 px-10 py-5 shadow-[0_0_30px_rgba(244,63,94,0.15)]">
+        <span className="font-mono text-[10px] tracking-[0.3em] uppercase text-zinc-400">Total Score</span>
+        <span
+          className={`mt-1 text-5xl font-black tabular-nums ${(currentProgress.score ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}
+        >
+          {currentProgress.score ?? 0}
+        </span>
+        <span className="mt-1 font-mono text-xs text-zinc-500">out of {currentProgress.maxScore ?? 150}</span>
+      </div>
+
+      {/* Organizer Mode Toggle Button */}
+      <div className="mt-6 flex justify-center">
+        <button
+          type="button"
+          onClick={() => setShowOrganizerPanel((prev) => !prev)}
+          className={`px-4 py-2 rounded-xl font-mono text-xs uppercase tracking-wider font-bold transition-all duration-200 border flex items-center gap-2 ${
+            isAuthorized
+              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+              : 'bg-zinc-900/90 text-zinc-300 border-zinc-700/70 hover:border-zinc-500 hover:text-zinc-100'
+          }`}
+        >
+          <span>{isAuthorized ? '🔓' : '🔒'}</span>
+          <span>{isAuthorized ? 'Organizer Mode (Active)' : 'Organizer Controls'}</span>
+        </button>
+      </div>
+
+      {/* Organizer Unlock Panel */}
+      {showOrganizerPanel && (
+        <div className="mt-4 p-5 rounded-xl border border-amber-500/30 bg-amber-950/20 text-left max-w-xl mx-auto motion-safe:animate-[modal-in_180ms_ease-out_both]">
+          <div className="flex items-center justify-between mb-3 border-b border-amber-500/20 pb-2">
+            <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+              <span>{isAuthorized ? '🔓' : '🔒'}</span>
+              <span>Organizer Score Correction</span>
+            </h3>
+            {isAuthorized && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAuthorized(false);
+                  setOrganizerKey('');
+                }}
+                className="text-[11px] font-mono text-amber-400/80 hover:text-amber-200 underline"
+              >
+                Lock Controls
+              </button>
+            )}
+          </div>
+
+          {!isAuthorized ? (
+            <form onSubmit={handleVerifyOrganizerKey} className="space-y-3">
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Enter the organizer passphrase to inspect and correct points for any question. All manual corrections are verified server-side and recorded in the audit log.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="password"
+                  placeholder="Organizer Passphrase"
+                  value={organizerKey}
+                  onChange={(e) => setOrganizerKey(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-lg bg-zinc-900/90 border border-zinc-700 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-400 font-mono"
+                />
+                <button
+                  type="submit"
+                  disabled={isCheckingKey || !organizerKey.trim()}
+                  className="px-4 py-2 rounded-lg bg-amber-500 text-zinc-950 font-mono text-xs font-bold uppercase tracking-wider hover:bg-amber-400 disabled:opacity-50 transition-colors"
+                >
+                  {isCheckingKey ? 'Verifying…' : 'Unlock'}
+                </button>
+              </div>
+              {authError && (
+                <p role="alert" className="text-xs text-rose-400 font-mono mt-1">
+                  ✗ {authError}
+                </p>
+              )}
+            </form>
+          ) : (
+            <div className="text-xs text-amber-200/90 space-y-1">
+              <p>✓ Authorized. Inline point adjustment controls are now active for each question below.</p>
+              <p className="text-zinc-400 text-[11px]">
+                Tip: Standard Hard scoring is +30 for correct and -20 for wrong (or 0 for skipped). You can assign any integer value.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Questions list with participant answer, model answer, and awarded points */}
+      <div className="mt-8 text-left">
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-2 mb-4">
+          <h3 className="font-mono text-xs tracking-[0.25em] uppercase text-zinc-400">
+            Hard Round Breakdown ({total} Questions)
+          </h3>
+          <span className="font-mono text-[11px] text-zinc-500">
+            {isRefreshing ? 'Syncing with server…' : 'Original Question Order'}
+          </span>
+        </div>
+
+        <ol className="space-y-5">
+          {questions.map((q, i) => {
+            const result = currentProgress.results?.[q.id];
+            const participantAnswer = currentProgress.answers[q.id];
+            const modelAnswer = currentProgress.modelAnswers?.[q.id];
+            const points = result?.points ?? 0;
+            const outcome = result?.needsReview
+              ? 'needs review'
+              : result?.skipped
+              ? 'skipped'
+              : result?.correct
+              ? 'correct'
+              : 'wrong';
+
+            return (
+              <li
+                key={q.id}
+                className="rounded-xl border border-zinc-700/60 bg-zinc-950/80 overflow-hidden shadow-xl"
+              >
+                {/* Header: Question title & points badge */}
+                <div className="px-5 py-3.5 border-b border-zinc-800 flex flex-wrap items-center justify-between gap-2 bg-zinc-900/40">
+                  <div className="flex items-baseline gap-2.5">
+                    <span className={`font-mono text-xs font-bold ${theme.text}`}>Q{i + 1}</span>
+                    <span className="text-sm font-semibold text-zinc-100">{'title' in q ? q.title : `Question ${i + 1}`}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold ${
+                        result?.needsReview
+                          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                          : points > 0
+                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                          : points < 0
+                          ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                          : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                      }`}
+                    >
+                      {result?.needsReview ? 'Pending Review' : points > 0 ? `+${points} pts` : `${points} pts`}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider font-bold ${
+                        outcome === 'correct'
+                          ? 'bg-emerald-400 text-zinc-950'
+                          : outcome === 'wrong'
+                          ? 'bg-rose-500 text-white'
+                          : outcome === 'needs review'
+                          ? 'bg-amber-400 text-zinc-950 shadow-[0_0_10px_rgba(251,191,36,0.2)]'
+                          : 'bg-zinc-700 text-zinc-300'
+                      }`}
+                    >
+                      {outcome}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Question context summary */}
+                <div className="px-5 py-2.5 text-xs text-zinc-400 border-b border-zinc-800/60 bg-zinc-950/40">
+                  <QuestionSummary question={q} />
+                </div>
+
+                {/* Review Reason banner if flagged for review */}
+                {result?.needsReview && (
+                  <div className="px-5 py-2.5 bg-amber-950/30 border-b border-amber-500/20 text-xs text-amber-300 font-mono flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span>⚠️</span>
+                      <span>{result.reviewReason || 'Flagged for organizer manual review'}</span>
+                    </div>
+                    <span className="text-[10px] text-amber-400/80 uppercase tracking-wider hidden sm:inline">Use organizer controls below to adjust</span>
+                  </div>
+                )}
+
+                {/* Comparison Grid */}
+                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Participant Answer */}
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 flex flex-col justify-between">
+                    <div>
+                      <div className="font-mono text-[10px] tracking-widest uppercase text-zinc-400 mb-2 flex items-center justify-between">
+                        <span>Participant Answer</span>
+                        <span className="text-zinc-500 text-[10px]">{teamName}</span>
+                      </div>
+                      {participantAnswer ? (
+                        <div className="font-mono text-xs text-zinc-100 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+                          {participantAnswer}
+                        </div>
+                      ) : (
+                        <div className="text-xs italic text-zinc-500 py-2">No answer submitted (skipped)</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Official Model Answer */}
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/20 p-4 flex flex-col justify-between">
+                    <div>
+                      <div className="font-mono text-[10px] tracking-widest uppercase text-emerald-400 mb-2 flex items-center justify-between">
+                        <span>Official Model Answer</span>
+                        <span className="text-emerald-500/80 text-[10px]">Kusal Sir</span>
+                      </div>
+                      <div className="font-mono text-xs text-emerald-200/90 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+                        {modelAnswer || '—'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Organizer Correction Row if authorized */}
+                {isAuthorized && (
+                  <div className="px-5 py-3 border-t border-amber-500/25 bg-amber-950/15">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+                          Adjust Points:
+                        </span>
+                        {/* Quick Presets */}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditingPoints((prev) => ({ ...prev, [q.id]: '30' }))
+                            }
+                            className="px-2 py-1 rounded bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] hover:bg-emerald-900/60"
+                          >
+                            +30 (Full)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditingPoints((prev) => ({ ...prev, [q.id]: '0' }))
+                            }
+                            className="px-2 py-1 rounded bg-zinc-900 border border-zinc-700 text-zinc-300 font-mono text-[10px] hover:bg-zinc-800"
+                          >
+                            0 (Zero)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditingPoints((prev) => ({ ...prev, [q.id]: '-20' }))
+                            }
+                            className="px-2 py-1 rounded bg-rose-950/60 border border-rose-500/40 text-rose-300 font-mono text-[10px] hover:bg-rose-900/60"
+                          >
+                            -20 (Wrong)
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={editingPoints[q.id] ?? String(points)}
+                          onChange={(e) =>
+                            setEditingPoints((prev) => ({ ...prev, [q.id]: e.target.value }))
+                          }
+                          className="w-20 px-2.5 py-1 rounded bg-zinc-900 border border-amber-500/40 font-mono text-xs text-zinc-100 text-center focus:outline-none focus:border-amber-400"
+                        />
+                        <button
+                          type="button"
+                          disabled={savingQuestionId === q.id}
+                          onClick={() => handleSaveCorrection(q.id)}
+                          className="px-3 py-1 rounded bg-amber-500 text-zinc-950 font-mono text-xs font-bold uppercase tracking-wider hover:bg-amber-400 disabled:opacity-50 transition-colors"
+                        >
+                          {savingQuestionId === q.id ? 'Saving…' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {statusMessage && statusMessage.qid === q.id && (
+                      <p
+                        role="alert"
+                        className={`mt-2 font-mono text-xs ${
+                          statusMessage.ok ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
+                      >
+                        {statusMessage.ok ? '✓ ' : '✗ '}
+                        {statusMessage.msg}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </section>
   );
 }
 

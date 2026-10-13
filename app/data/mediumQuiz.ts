@@ -77,7 +77,7 @@ export const MEDIUM_QUIZ: readonly QuizQuestion[] = [
     question: 'What does CI/CD stand for in modern software engineering deployment pipelines?',
     options: [
       { key: 'A', text: 'Code Integration / Code Debug' },
-      { key: 'B', text: 'Continuous Integration / Delivery' },
+      { key: 'B', text: 'Continuous Integration / Continuous Deployment' },
       { key: 'C', text: 'Compiled Input / Core Database' },
       { key: 'D', text: 'Central Instance / Cloud Data' },
     ],
