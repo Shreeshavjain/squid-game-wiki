@@ -434,7 +434,7 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint, allowSki
                             </div>
                             <div className="mt-0.5 text-sm text-zinc-200 truncate">
                               {picked ? (
-                                <span className="font-mono font-bold text-zinc-50">{picked}</span>
+                                <span className="font-mono font-bold text-zinc-50">{picked.replace(/\n+/g, ' · ')}</span>
                               ) : (
                                 <span className="italic text-zinc-500">Skipped</span>
                               )}
@@ -682,15 +682,534 @@ function WrittenBody({
         <RichText text={question.question} boldClassName={theme.underline} />
       </p>
 
-      <AnswerBox
-        value={value}
-        onChange={onChange}
-        onSubmit={onSubmit}
-        isLast={isLast}
-        theme={theme}
-        placeholder={question.placeholder ?? 'Type your answer…'}
-      />
+      {question.interaction?.type === 'hard_emojis' ? (
+        <HardEmojiInputs
+          items={question.interaction.items}
+          value={value}
+          onChange={onChange}
+          onSubmit={onSubmit}
+          theme={theme}
+        />
+      ) : question.interaction?.type === 'hard_whoami' ? (
+        <HardWhoAmIInputs
+          value={value}
+          onChange={onChange}
+          onSubmit={onSubmit}
+          theme={theme}
+        />
+      ) : question.interaction?.type === 'hard_puzzle' ? (
+        <HardPuzzleInput
+          value={value}
+          onChange={onChange}
+          onSubmit={onSubmit}
+          theme={theme}
+        />
+      ) : question.interaction?.type === 'hard_binary_search' ? (
+        <HardBinarySearchInputs
+          value={value}
+          onChange={onChange}
+          onSubmit={onSubmit}
+          theme={theme}
+        />
+      ) : question.interaction?.type === 'hard_matching' ? (
+        <HardMatchingMatrix
+          licenses={question.interaction.licenses}
+          features={question.interaction.features}
+          value={value}
+          onChange={onChange}
+          theme={theme}
+        />
+      ) : (
+        <AnswerBox
+          value={value}
+          onChange={onChange}
+          onSubmit={onSubmit}
+          isLast={isLast}
+          theme={theme}
+          placeholder={question.placeholder ?? 'Type your answer…'}
+        />
+      )}
     </>
+  );
+}
+
+// ── Hard Q1: Five Emojis → Languages ────────────────────────────
+function HardEmojiInputs({
+  items,
+  value,
+  onChange,
+  onSubmit,
+  theme,
+}: {
+  items: readonly { readonly id: string; readonly label: string; readonly emoji: string }[];
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  theme: QuizTheme;
+}) {
+  const parseLines = (val: string) => {
+    const map: Record<string, string> = {};
+    for (const line of val.split('\n')) {
+      const match = line.match(/^\(([a-eA-E])\)\s*(.*)$/);
+      if (match) {
+        map[match[1].toLowerCase()] = match[2];
+      }
+    }
+    return map;
+  };
+
+  const parsed = parseLines(value);
+
+  const update = (id: string, text: string) => {
+    const updated = { ...parsed, [id.toLowerCase()]: text };
+    const serialized = items
+      .map((it) => `${it.label} ${updated[it.id.toLowerCase()] || ''}`.trimEnd())
+      .join('\n');
+    onChange(serialized);
+  };
+
+  return (
+    <div className="mt-5 space-y-2.5">
+      <div className="font-mono text-[10px] tracking-widest uppercase text-zinc-400 mb-1">
+        Identify the programming language for each emoji:
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+        {items.map((item, idx) => (
+          <div
+            key={item.id}
+            className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-3.5 flex flex-col justify-between transition-all"
+          >
+            <div className="flex items-center gap-2 mb-2 font-mono text-xs">
+              <span className="text-2xl leading-none" role="img" aria-label={item.label}>
+                {item.emoji}
+              </span>
+              <span className={`font-bold ${theme.text}`}>{item.label}</span>
+            </div>
+            <input
+              type="text"
+              autoFocus={idx === 0 && !value}
+              value={parsed[item.id.toLowerCase()] || ''}
+              onChange={(e) => update(item.id, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  onSubmit();
+                }
+              }}
+              placeholder={`Language for ${item.label}…`}
+              className={[
+                'w-full rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3 py-2',
+                'text-sm font-mono text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow]',
+                theme.input,
+                theme.caret,
+              ].join(' ')}
+            />
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 font-mono text-[10px] tracking-wider text-zinc-600 uppercase">
+        Press Ctrl / ⌘ + Enter to continue
+      </p>
+    </div>
+  );
+}
+
+// ── Hard Q2: Who Am I? ──────────────────────────────────────────
+function HardWhoAmIInputs({
+  value,
+  onChange,
+  onSubmit,
+  theme,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  theme: QuizTheme;
+}) {
+  const parse = (val: string) => {
+    let person = '';
+    let creation1 = '';
+    let creation2 = '';
+    for (const line of val.split('\n')) {
+      if (/^person:\s*/i.test(line)) person = line.replace(/^person:\s*/i, '');
+      else if (/^creation 1:\s*/i.test(line)) creation1 = line.replace(/^creation 1:\s*/i, '');
+      else if (/^creation 2:\s*/i.test(line)) creation2 = line.replace(/^creation 2:\s*/i, '');
+    }
+    if (!person && !creation1 && !creation2 && val.trim()) {
+      const lines = val.split('\n');
+      person = lines[0] || '';
+      creation1 = lines[1] || '';
+      creation2 = lines[2] || '';
+    }
+    return { person, creation1, creation2 };
+  };
+
+  const current = parse(value);
+
+  const update = (field: 'person' | 'creation1' | 'creation2', text: string) => {
+    const next = { ...current, [field]: text };
+    const serialized = [
+      `Person: ${next.person}`,
+      `Creation 1: ${next.creation1}`,
+      `Creation 2: ${next.creation2}`,
+    ].join('\n');
+    onChange(serialized);
+  };
+
+  return (
+    <div className="mt-5 space-y-3">
+      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
+        <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1.5 flex items-center gap-1.5">
+          <span className={`font-bold ${theme.text}`}>1. Identity</span>
+          <span className="text-zinc-500">— Who am I?</span>
+        </label>
+        <input
+          type="text"
+          autoFocus={!value}
+          value={current.person}
+          onChange={(e) => update('person', e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              onSubmit();
+            }
+          }}
+          placeholder="Name of the person (creator)…"
+          className={[
+            'w-full rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3.5 py-2.5',
+            'text-sm font-mono text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow]',
+            theme.input,
+            theme.caret,
+          ].join(' ')}
+        />
+      </div>
+
+      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
+        <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1.5 flex items-center gap-1.5">
+          <span className={`font-bold ${theme.text}`}>2. Creation 1</span>
+          <span className="text-zinc-500">— 1991 hobby project (servers & Android)</span>
+        </label>
+        <input
+          type="text"
+          value={current.creation1}
+          onChange={(e) => update('creation1', e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              onSubmit();
+            }
+          }}
+          placeholder="Name of the first creation / OS kernel…"
+          className={[
+            'w-full rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3.5 py-2.5',
+            'text-sm font-mono text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow]',
+            theme.input,
+            theme.caret,
+          ].join(' ')}
+        />
+      </div>
+
+      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
+        <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1.5 flex items-center gap-1.5">
+          <span className={`font-bold ${theme.text}`}>3. Creation 2</span>
+          <span className="text-zinc-500">— Version control tool used on GitHub</span>
+        </label>
+        <input
+          type="text"
+          value={current.creation2}
+          onChange={(e) => update('creation2', e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              onSubmit();
+            }
+          }}
+          placeholder="Name of the version control tool…"
+          className={[
+            'w-full rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3.5 py-2.5',
+            'text-sm font-mono text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow]',
+            theme.input,
+            theme.caret,
+          ].join(' ')}
+        />
+      </div>
+
+      <p className="mt-2 font-mono text-[10px] tracking-wider text-zinc-600 uppercase">
+        Press Ctrl / ⌘ + Enter to continue
+      </p>
+    </div>
+  );
+}
+
+// ── Hard Q3: Switch Puzzle ──────────────────────────────────────
+function HardPuzzleInput({
+  value,
+  onChange,
+  onSubmit,
+  theme,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  theme: QuizTheme;
+}) {
+  return (
+    <div className="mt-5">
+      <div className="flex items-center justify-between mb-2">
+        <label htmlFor="puzzle-solution" className="font-mono text-[10px] tracking-widest uppercase text-zinc-400">
+          Step-by-Step Procedure & Reasoning
+        </label>
+        <span className="font-mono text-[10px] text-zinc-500 uppercase">Single Entry Allowed</span>
+      </div>
+      <textarea
+        id="puzzle-solution"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            onSubmit();
+          }
+        }}
+        rows={7}
+        autoFocus={!value}
+        placeholder={`Describe your complete procedure:\n1. Which switch do you turn on first, and how long do you wait?\n2. What do you do before entering the room?\n3. When entering the room once, how do you identify which switch controls which bulb based on what you see and feel?`}
+        className={[
+          'w-full rounded-xl border border-zinc-700/60 bg-zinc-950/70 px-4 py-3.5',
+          'text-sm leading-relaxed text-zinc-50 placeholder:text-zinc-600 outline-none min-h-[11rem] resize-y transition-[border-color,box-shadow]',
+          theme.input,
+          theme.caret,
+        ].join(' ')}
+      />
+      <p className="mt-2 font-mono text-[10px] tracking-wider text-zinc-600 uppercase">
+        Press Ctrl / ⌘ + Enter to continue
+      </p>
+    </div>
+  );
+}
+
+// ── Hard Q4: Binary Search Bugs ─────────────────────────────────
+function HardBinarySearchInputs({
+  value,
+  onChange,
+  onSubmit,
+  theme,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  theme: QuizTheme;
+}) {
+  const parse = (val: string) => {
+    let bug1 = '';
+    let bug2 = '';
+    let hangs = '';
+    let wrong = '';
+    for (const line of val.split('\n')) {
+      if (/^bug 1:\s*/i.test(line)) bug1 = line.replace(/^bug 1:\s*/i, '');
+      else if (/^bug 2:\s*/i.test(line)) bug2 = line.replace(/^bug 2:\s*/i, '');
+      else if (/^input that hangs:\s*/i.test(line)) hangs = line.replace(/^input that hangs:\s*/i, '');
+      else if (/^input with wrong answer:\s*/i.test(line)) wrong = line.replace(/^input with wrong answer:\s*/i, '');
+    }
+    return { bug1, bug2, hangs, wrong };
+  };
+
+  const current = parse(value);
+
+  const update = (field: 'bug1' | 'bug2' | 'hangs' | 'wrong', text: string) => {
+    const next = { ...current, [field]: text };
+    const serialized = [
+      `Bug 1: ${next.bug1}`,
+      `Bug 2: ${next.bug2}`,
+      `Input that hangs: ${next.hangs}`,
+      `Input with wrong answer: ${next.wrong}`,
+    ].join('\n');
+    onChange(serialized);
+  };
+
+  return (
+    <div className="mt-5 space-y-3">
+      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
+        <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1 flex items-center gap-1.5">
+          <span className={`font-bold ${theme.text}`}>Bug 1</span>
+          <span className="text-zinc-500">— Search bounds & infinite loop</span>
+        </label>
+        <textarea
+          rows={2}
+          value={current.bug1}
+          onChange={(e) => update('bug1', e.target.value)}
+          placeholder="Describe Bug 1 (e.g. how low or high are updated, causing an infinite loop)…"
+          className={[
+            'w-full rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3.5 py-2',
+            'text-sm text-zinc-50 placeholder:text-zinc-600 outline-none resize-none transition-[border-color,box-shadow]',
+            theme.input,
+            theme.caret,
+          ].join(' ')}
+        />
+      </div>
+
+      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
+        <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1 flex items-center gap-1.5">
+          <span className={`font-bold ${theme.text}`}>Bug 2</span>
+          <span className="text-zinc-500">— Loop termination & skipped case</span>
+        </label>
+        <textarea
+          rows={2}
+          value={current.bug2}
+          onChange={(e) => update('bug2', e.target.value)}
+          placeholder="Describe Bug 2 (e.g. while loop condition when 1 element remains)…"
+          className={[
+            'w-full rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3.5 py-2',
+            'text-sm text-zinc-50 placeholder:text-zinc-600 outline-none resize-none transition-[border-color,box-shadow]',
+            theme.input,
+            theme.caret,
+          ].join(' ')}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
+          <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1 flex items-center gap-1.5">
+            <span className={`font-bold ${theme.text}`}>Input That Hangs</span>
+          </label>
+          <input
+            type="text"
+            value={current.hangs}
+            onChange={(e) => update('hangs', e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                onSubmit();
+              }
+            }}
+            placeholder="e.g. binary_search([1, 3, 5, 7], 7)"
+            className={[
+              'w-full font-mono rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3 py-2',
+              'text-xs sm:text-sm text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow]',
+              theme.input,
+              theme.caret,
+            ].join(' ')}
+          />
+        </div>
+
+        <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
+          <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1 flex items-center gap-1.5">
+            <span className={`font-bold ${theme.text}`}>Input With Wrong Answer</span>
+          </label>
+          <input
+            type="text"
+            value={current.wrong}
+            onChange={(e) => update('wrong', e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                onSubmit();
+              }
+            }}
+            placeholder="e.g. binary_search([5], 5)"
+            className={[
+              'w-full font-mono rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3 py-2',
+              'text-xs sm:text-sm text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow]',
+              theme.input,
+              theme.caret,
+            ].join(' ')}
+          />
+        </div>
+      </div>
+
+      <p className="mt-2 font-mono text-[10px] tracking-wider text-zinc-600 uppercase">
+        Press Ctrl / ⌘ + Enter to continue
+      </p>
+    </div>
+  );
+}
+
+// ── Hard Q5: License Matching Matrix ────────────────────────────
+function HardMatchingMatrix({
+  licenses,
+  features,
+  value,
+  onChange,
+  theme,
+}: {
+  licenses: readonly string[];
+  features: readonly { readonly key: string; readonly text: string }[];
+  value: string;
+  onChange: (value: string) => void;
+  theme: QuizTheme;
+}) {
+  const parse = (val: string) => {
+    const map: Record<string, string> = {};
+    for (const line of val.split('\n')) {
+      const match = line.match(/^([A-Za-z0-9\.\s]+?)\s*[→:=–\-]\s*([A-Da-d])/);
+      if (match) {
+        map[match[1].trim()] = match[2].toUpperCase();
+      }
+    }
+    return map;
+  };
+
+  const matches = parse(value);
+
+  const updateMatch = (license: string, choiceKey: string) => {
+    const next = { ...matches, [license]: choiceKey };
+    const serialized = licenses
+      .map((lic) => `${lic} → ${next[lic] || ''}`.trimEnd())
+      .join('\n');
+    onChange(serialized);
+  };
+
+  return (
+    <div className="mt-5 space-y-3">
+      <div className="font-mono text-[10px] tracking-widest uppercase text-zinc-400 mb-1">
+        Select the matching feature (A, B, C, or D) for each license:
+      </div>
+      {licenses.map((license) => {
+        const selectedKey = matches[license] || '';
+        const matchedFeature = features.find((f) => f.key === selectedKey);
+        return (
+          <div
+            key={license}
+            className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4 transition-all"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="font-mono font-bold text-base text-zinc-100 flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${theme.dot}`} />
+                {license}
+              </div>
+              <div className="flex items-center gap-2">
+                {features.map((feat) => {
+                  const isPicked = selectedKey === feat.key;
+                  return (
+                    <button
+                      key={feat.key}
+                      type="button"
+                      onClick={() => updateMatch(license, feat.key)}
+                      className={[
+                        'w-9 h-9 rounded-lg font-mono text-xs font-bold transition-all duration-150 border cursor-pointer',
+                        'focus:outline-none focus-visible:ring-2',
+                        theme.ring,
+                        isPicked
+                          ? theme.badgeSelected
+                          : 'border-zinc-700/70 bg-zinc-900/80 text-zinc-300 hover:border-zinc-500 hover:text-zinc-50',
+                      ].join(' ')}
+                    >
+                      {feat.key}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {matchedFeature && (
+              <div className="mt-2.5 pt-2 border-t border-zinc-800/80 font-mono text-xs text-rose-300/90 flex items-baseline gap-1.5">
+                <span className="font-bold text-zinc-400">{matchedFeature.key}.</span>
+                <span>{matchedFeature.text}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

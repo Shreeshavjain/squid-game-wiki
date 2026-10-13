@@ -14,6 +14,7 @@ export default function HardQuizPage() {
         tier={{ ...HARD_TIER, id: 'hard' }}
         quizTitle="Programming & Open Source"
         questions={HARD_QUIZ}
+        scoreEndpoint="/api/quiz/hard/score"
       />
     </Suspense>
   );

@@ -30,6 +30,16 @@ export const HARD_QUIZ: readonly QuizQuestion[] = [
     ],
     question: 'Name the programming language each emoji represents.',
     placeholder: '(a) …\n(b) …\n(c) …\n(d) …\n(e) …',
+    interaction: {
+      type: 'hard_emojis',
+      items: [
+        { id: 'a', label: '(a)', emoji: '☕' },
+        { id: 'b', label: '(b)', emoji: '💎' },
+        { id: 'c', label: '(c)', emoji: '🐹' },
+        { id: 'd', label: '(d)', emoji: '🐦' },
+        { id: 'e', label: '(e)', emoji: '🐪' },
+      ],
+    },
   },
   {
     id: 'q2',
@@ -44,6 +54,9 @@ export const HARD_QUIZ: readonly QuizQuestion[] = [
       },
     ],
     question: 'Who am I, and what are the two creations?',
+    interaction: {
+      type: 'hard_whoami',
+    },
   },
   {
     id: 'q3',
@@ -58,6 +71,9 @@ export const HARD_QUIZ: readonly QuizQuestion[] = [
       },
     ],
     question: 'How do you find which switch controls which bulb?',
+    interaction: {
+      type: 'hard_puzzle',
+    },
   },
   {
     id: 'q4',
@@ -85,6 +101,9 @@ export const HARD_QUIZ: readonly QuizQuestion[] = [
     ],
     question:
       'Find both bugs, and give an input where the code hangs and another where it returns the wrong answer.',
+    interaction: {
+      type: 'hard_binary_search',
+    },
   },
   {
     id: 'q5',
@@ -105,5 +124,15 @@ export const HARD_QUIZ: readonly QuizQuestion[] = [
     ],
     question: 'Match each license to its key feature.',
     placeholder: 'MIT → …\nGPL v3 → …\nApache 2.0 → …\nAGPL → …',
+    interaction: {
+      type: 'hard_matching',
+      licenses: ['MIT', 'GPL v3', 'Apache 2.0', 'AGPL'],
+      features: [
+        { key: 'A', text: 'Anyone who modifies it and offers it as a network service must share their source' },
+        { key: 'B', text: 'Very short and permissive, only requires keeping the copyright notice' },
+        { key: 'C', text: 'Derivative works that are distributed must also be GPL (copyleft)' },
+        { key: 'D', text: 'Permissive, but with an explicit patent grant' },
+      ],
+    },
   },
 ];

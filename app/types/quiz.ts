@@ -40,6 +40,20 @@ export interface UnscrambleQuestion extends QuizQuestionBase {
   readonly hint: string;
 }
 
+export type HardInteractionConfig =
+  | {
+      readonly type: 'hard_emojis';
+      readonly items: readonly { readonly id: string; readonly label: string; readonly emoji: string }[];
+    }
+  | { readonly type: 'hard_whoami' }
+  | { readonly type: 'hard_puzzle' }
+  | { readonly type: 'hard_binary_search' }
+  | {
+      readonly type: 'hard_matching';
+      readonly licenses: readonly string[];
+      readonly features: readonly { readonly key: string; readonly text: string }[];
+    };
+
 /** Descriptive: free-form written answer to a prompt with optional context */
 export interface WrittenQuestion extends QuizQuestionBase {
   readonly kind: 'written';
@@ -48,6 +62,8 @@ export interface WrittenQuestion extends QuizQuestionBase {
   readonly question: string;
   /** Placeholder for the answer box, e.g. to suggest a per-part layout */
   readonly placeholder?: string;
+  /** Custom interaction configuration for structured inputs */
+  readonly interaction?: HardInteractionConfig;
 }
 
 export type QuizQuestion = McqQuestion | EmojiQuestion | UnscrambleQuestion | WrittenQuestion;
