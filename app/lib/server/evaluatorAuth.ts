@@ -1,11 +1,17 @@
 import 'server-only';
 import crypto from 'crypto';
 
-const SECRET = process.env.ADMIN_PASSCODE || process.env.ORGANIZER_KEY || 'wikiclub-admin-2026';
+const getSecret = () =>
+  (
+    process.env.ORGANIZER_PASSCODE ||
+    process.env.ORGANIZER_KEY ||
+    process.env.ADMIN_PASSCODE ||
+    'wikiclub-admin-2026'
+  ).trim();
 
 export function verifyEvaluatorPasscode(passcode: unknown): boolean {
   if (typeof passcode !== 'string' || !passcode.trim()) return false;
-  return passcode.trim() === SECRET.trim();
+  return passcode.trim() === getSecret();
 }
 
 /**
@@ -13,8 +19,9 @@ export function verifyEvaluatorPasscode(passcode: unknown): boolean {
  * Valid for 24 hours.
  */
 export function createEvaluatorSessionToken(): string {
+  const secret = getSecret();
   const timestamp = Date.now().toString();
-  const signature = crypto.createHmac('sha256', SECRET).update(`evaluator:${timestamp}`).digest('hex');
+  const signature = crypto.createHmac('sha256', secret).update(`evaluator:${timestamp}`).digest('hex');
   return `${timestamp}.${signature}`;
 }
 
@@ -33,7 +40,8 @@ export function verifyEvaluatorSessionToken(token: string | null | undefined): b
   // Max session age: 24 hours
   if (Date.now() - timeNum > 24 * 60 * 60 * 1000) return false;
 
-  const expectedSignature = crypto.createHmac('sha256', SECRET).update(`evaluator:${timestamp}`).digest('hex');
+  const secret = getSecret();
+  const expectedSignature = crypto.createHmac('sha256', secret).update(`evaluator:${timestamp}`).digest('hex');
 
   try {
     return crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expectedSignature, 'hex'));

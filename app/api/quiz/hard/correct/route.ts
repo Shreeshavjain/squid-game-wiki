@@ -36,7 +36,14 @@ export async function POST(request: Request) {
   const { action, teamName, questionId, correctedPoints, organizerKey } = body;
 
   // ── Authorization ──
-  if (typeof organizerKey !== 'string' || organizerKey !== ORGANIZER_KEY) {
+  const validOrganizerKey = (
+    process.env.ORGANIZER_PASSCODE ||
+    process.env.ORGANIZER_KEY ||
+    process.env.ADMIN_PASSCODE ||
+    'wikiclub-correct-2026'
+  ).trim();
+
+  if (typeof organizerKey !== 'string' || organizerKey.trim() !== validOrganizerKey) {
     return Response.json({ error: 'Unauthorized: invalid organizer key' }, { status: 403 });
   }
 
