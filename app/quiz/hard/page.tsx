@@ -15,6 +15,7 @@ export default function HardQuizPage() {
         quizTitle="Programming & Open Source"
         questions={HARD_QUIZ}
         scoreEndpoint="/api/quiz/hard/score"
+        allowSkip
       />
     </Suspense>
   );

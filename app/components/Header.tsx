@@ -79,21 +79,15 @@ export function Header({ session, isLocked }: HeaderProps) {
             </span>
           </div>
 
-          {/* Squad Session Tag */}
+          {/* Team Tag */}
           <div className="flex items-center space-x-2">
             <div className="text-right">
-              <div className="flex items-center justify-end space-x-1.5">
-                <span className="font-mono text-xs font-bold text-zinc-200 tracking-wider">
-                  {session.teamId}
-                </span>
-                <span className="text-zinc-600 text-[10px] font-mono">/</span>
-                <span className="font-mono text-[11px] text-zinc-400 truncate max-w-[120px] sm:max-w-[160px]">
-                  {session.teamName}
-                </span>
-              </div>
-              <div className="font-mono text-[10px] text-zinc-500 tracking-wider">
-                {session.sessionCode}
-              </div>
+              <span
+                className="font-mono text-xs sm:text-sm font-bold text-zinc-200 tracking-wider truncate max-w-[160px] sm:max-w-[240px] block"
+                title={session.teamName}
+              >
+                {session.teamName}
+              </span>
             </div>
           </div>
         </div>
