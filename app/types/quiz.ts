@@ -83,3 +83,11 @@ export interface QuizProgress {
   /** Model answers for display on the results page (Hard only) */
   modelAnswers?: Record<string, string>;
 }
+
+export type EvaluatorDecision = 'correct' | 'wrong' | 'ungraded';
+
+export interface EvaluatorGradeRecord {
+  decision: EvaluatorDecision;
+  points: number;
+  evaluatedAt: string | Date;
+}

@@ -1,7 +1,6 @@
-import { HARD_QUESTION_IDS, HARD_MODEL_ANSWERS } from '../../../../lib/server/answerKeys';
+import { HARD_QUESTION_IDS, HARD_MODEL_ANSWERS, evaluateHardAnswer } from '../../../../lib/server/answerKeys';
 import { DIFFICULTY_TIERS } from '../../../../data/difficultyTiers';
-import { QuestionResult, recordSubmission } from '../../../../lib/server/db';
-import { evaluateHardQuizBatchWithGemini } from '../../../../lib/server/geminiEvaluator';
+import { QuestionResult, getTeamRecord, recordSubmission } from '../../../../lib/server/db';
 
 const HARD_SCORING = DIFFICULTY_TIERS.find((t) => t.id === 'hard')!.scoring!;
 
@@ -9,19 +8,12 @@ const HARD_SCORING = DIFFICULTY_TIERS.find((t) => t.id === 'hard')!.scoring!;
  * POST /api/quiz/hard/score
  * Body: { teamName: 'Sang-Woo Consortium', answers: { q1: '...', q2: '...', ... } }
  *
- * Grades Hard round answers on the server using Gemini (@google/genai SDK)
- * in a SINGLE batched API request against the official questions, model answers,
- * and grading criteria from "docs/Hard_Level_Questions (1).pdf".
- *
+ * Grades Hard round answers on the server against the official answer key
+ * and keyword-matching rules from "docs/Hard_Level_Questions (1).pdf".
  * Scoring follows DIFFICULTY_TIERS: +30 for correct, -20 for wrong (max 150 points).
- * Gemini judges semantic meaning, synonyms, and factual correctness, returning
- * an independent structured decision per question ('correct' | 'incorrect' | 'needs_review').
- * Points and totals are calculated entirely by the application.
- *
- * On API timeout, quota error, or service outage, questions are flagged with
- * needsReview: true for manual review instead of silently awarding zero points.
+ * Skipped answers score 0 points (no deduction).
  * Records final answers, calculated score, per-question results, and model answers to MongoDB.
- * Returns { score, maxScore, results, modelAnswers } without leaking API keys or secrets.
+ * Returns { score, maxScore, results, modelAnswers } without leaking answer keys.
  */
 export async function POST(request: Request) {
   let teamName: unknown;
@@ -42,32 +34,35 @@ export async function POST(request: Request) {
   const submitted = answers as Record<string, unknown>;
   const questionIds = HARD_QUESTION_IDS;
 
-  // Single batched Gemini evaluation for all submitted answers (1 API call per team)
-  const batchEvaluation = await evaluateHardQuizBatchWithGemini(submitted);
+  const existingTeam = await getTeamRecord(teamName);
+  const evaluatorGrades = existingTeam?.evaluatorGrades ?? {};
 
   const results: Record<string, QuestionResult> = {};
   for (const id of questionIds) {
-    const item = batchEvaluation[id];
-    if (item?.skipped) {
-      results[id] = { correct: false, skipped: true, points: 0 };
-    } else if (item?.decision === 'correct') {
+    if (evaluatorGrades[id]) {
+      const g = evaluatorGrades[id];
       results[id] = {
-        correct: true,
-        points: HARD_SCORING.correct,
-      };
-    } else if (item?.decision === 'incorrect') {
-      results[id] = {
-        correct: false,
-        points: HARD_SCORING.wrong,
+        correct: g.points > 0,
+        points: g.points,
+        skipped: g.decision === 'ungraded',
+        needsReview: false,
       };
     } else {
-      // 'needs_review': safe manual-review fallback (API error, quota, or ambiguous answer)
-      results[id] = {
-        correct: false,
-        points: 0,
-        needsReview: true,
-        reviewReason: item?.reason || 'Flagged for organizer review',
-      };
+      const raw = typeof submitted[id] === 'string' ? (submitted[id] as string) : '';
+      const evaluation = evaluateHardAnswer(id, raw);
+      if (evaluation.skipped) {
+        results[id] = { correct: false, skipped: true, points: 0 };
+      } else if (evaluation.correct) {
+        results[id] = {
+          correct: true,
+          points: HARD_SCORING.correct,
+        };
+      } else {
+        results[id] = {
+          correct: false,
+          points: HARD_SCORING.wrong,
+        };
+      }
     }
   }
 
@@ -89,4 +84,3 @@ export async function POST(request: Request) {
 
   return Response.json({ score, maxScore, results, modelAnswers });
 }
-

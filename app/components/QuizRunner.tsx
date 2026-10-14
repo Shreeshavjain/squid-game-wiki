@@ -4,10 +4,11 @@ import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DEFAULT_TEAM_SESSION } from '../data/difficultyTiers';
 import { DifficultyTier } from '../types/difficulty';
-import { QuizContextBlock, QuizProgress, QuizQuestion } from '../types/quiz';
+import { QuizContextBlock, QuizProgress, QuizQuestion, EvaluatorDecision } from '../types/quiz';
 import { ArenaBackground } from './ArenaBackground';
 import { Header } from './Header';
 import { RichText } from './RichText';
+import { EvaluatorMode } from './EvaluatorMode';
 import { getLockedTier, setLockedTier, getQuizProgress, saveQuizProgress } from '../lib/trialStorage';
 
 /**
@@ -175,6 +176,26 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint, allowSki
     saveQuizProgress(teamName, tier.id, next);
     setProgress(next);
     setDraft(null);
+  };
+
+  const handleEvaluatorScoreUpdate = (newScore: number, questionId?: string, decision?: EvaluatorDecision) => {
+    if (progress) {
+      const nextResults = { ...(progress.results || {}) };
+      if (questionId && decision) {
+        const points = decision === 'correct' ? 30 : decision === 'wrong' ? -20 : 0;
+        nextResults[questionId] = {
+          correct: points > 0,
+          points,
+          skipped: decision === 'ungraded',
+          needsReview: false,
+        };
+      }
+      commit({
+        ...progress,
+        score: newScore,
+        results: nextResults,
+      });
+    }
   };
 
   const goTo = (index: number) => {
@@ -419,6 +440,14 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint, allowSki
           </>
         )}
       </main>
+
+      {tier.id === 'hard' && (
+        <EvaluatorMode
+          teamName={teamName}
+          questions={questions}
+          onScoreUpdated={handleEvaluatorScoreUpdate}
+        />
+      )}
     </div>
   );
 }
@@ -1876,7 +1905,7 @@ function AnswerBox({
 }
 
 // ── Shared: one-line description of a question for reports ──────
-function QuestionSummary({ question }: { question: QuizQuestion }) {
+export function QuestionSummary({ question }: { question: QuizQuestion }) {
   switch (question.kind) {
     case 'emoji':
       return (

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function EntryPage() {
   const router = useRouter();
@@ -124,6 +125,16 @@ export default function EntryPage() {
           />
         </div>
       </div>
+
+      {/* Discreet Supervisor Entry Point */}
+      <Link
+        href="/admin"
+        aria-label="Supervisor Portal"
+        title="Supervisor Portal"
+        className="fixed bottom-3 right-3 sm:bottom-4 sm:right-4 z-50 font-mono text-xs sm:text-sm tracking-widest text-zinc-500/60 hover:text-rose-500 hover:scale-105 transition-all select-none p-2 cursor-pointer"
+      >
+        ○△□
+      </Link>
     </main>
   );
 }
