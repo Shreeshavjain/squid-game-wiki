@@ -1340,15 +1340,38 @@ function DescriptiveBody({
         <span className={`font-bold ${theme.text}`}>Hint:</span> {question.hint}
       </p>
 
-      <AnswerBox
+      {/* ── Single-line Answer for One-Word Challenges (Easy level) ── */}
+      <label htmlFor="quiz-answer" className="mt-5 block font-mono text-[10px] tracking-widest uppercase text-zinc-500">
+        Your answer
+      </label>
+      <input
+        id="quiz-answer"
+        type="text"
         value={value}
-        onChange={onChange}
-        onSubmit={onSubmit}
-        isLast={isLast}
-        theme={theme}
-        monospaceCaps={!isEmoji}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onSubmit();
+          }
+        }}
+        autoFocus
+        autoComplete="off"
+        autoCapitalize={isEmoji ? 'off' : 'characters'}
+        spellCheck={false}
         placeholder={isEmoji ? 'Type your answer…' : `Type the ${question.letters.length}-letter word…`}
+        aria-describedby="quiz-question"
+        className={[
+          'mt-2 block w-full rounded-xl border border-zinc-700/60 bg-zinc-950/70 px-4 py-3.5',
+          'text-base leading-relaxed text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow] duration-150',
+          isEmoji ? '' : 'font-mono uppercase tracking-[0.3em]',
+          theme.input,
+          theme.caret,
+        ].join(' ')}
       />
+      <p className="mt-2 font-mono text-[10px] tracking-wider text-zinc-500 uppercase">
+        Press Enter to {isLast ? 'submit' : 'continue'}
+      </p>
     </>
   );
 }
