@@ -398,11 +398,11 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
                       <span className="text-zinc-500 font-mono text-[10px]">{teamName}</span>
                     </div>
                     {participantAnswer ? (
-                      <div className="font-mono text-xs text-zinc-100 whitespace-pre-wrap leading-relaxed max-h-52 overflow-y-auto p-3 rounded-lg bg-zinc-900/70 border border-zinc-800/80">
+                      <div className="font-mono text-xs text-zinc-100 whitespace-pre-wrap break-words [tab-size:4] leading-relaxed max-h-[30rem] overflow-y-auto p-4 rounded-xl bg-zinc-900/90 border border-zinc-800 selection:bg-pink-500/30 shadow-inner">
                         {participantAnswer}
                       </div>
                     ) : (
-                      <div className="p-4 rounded-lg bg-zinc-900/40 border border-zinc-800/60 text-xs italic text-zinc-500 font-mono">
+                      <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800/60 text-xs italic text-zinc-500 font-mono">
                         (No answer submitted / skipped)
                       </div>
                     )}
@@ -414,7 +414,7 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
                       <span>Official Model Answer (Reference)</span>
                       <span className="text-emerald-500 text-[10px]">Kusal Sir</span>
                     </div>
-                    <div className="font-mono text-xs text-emerald-200/90 whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
+                    <div className="font-mono text-xs text-emerald-200/90 whitespace-pre-wrap break-words [tab-size:4] leading-relaxed max-h-60 overflow-y-auto p-3.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 shadow-inner selection:bg-emerald-500/30">
                       {modelAnswer || '—'}
                     </div>
                   </div>

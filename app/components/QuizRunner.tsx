@@ -1007,11 +1007,13 @@ function HardResultsSection({
                         <span className="text-zinc-500 text-[10px]">{teamName}</span>
                       </div>
                       {participantAnswer ? (
-                        <div className="font-mono text-xs text-zinc-100 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+                        <div className="font-mono text-xs text-zinc-100 whitespace-pre-wrap break-words [tab-size:4] leading-relaxed max-h-[30rem] overflow-y-auto p-3.5 rounded-lg bg-zinc-950/80 border border-zinc-800/80 shadow-inner selection:bg-pink-500/30">
                           {participantAnswer}
                         </div>
                       ) : (
-                        <div className="text-xs italic text-zinc-500 py-2">No answer submitted (skipped)</div>
+                        <div className="text-xs italic text-zinc-500 py-3 px-3 rounded-lg bg-zinc-950/40 border border-zinc-800/60 font-mono">
+                          No answer submitted (skipped)
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1023,7 +1025,7 @@ function HardResultsSection({
                         <span>Official Model Answer</span>
                         <span className="text-emerald-500/80 text-[10px]">Kusal Sir</span>
                       </div>
-                      <div className="font-mono text-xs text-emerald-200/90 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+                      <div className="font-mono text-xs text-emerald-200/90 whitespace-pre-wrap break-words [tab-size:4] leading-relaxed max-h-[30rem] overflow-y-auto p-3.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 shadow-inner selection:bg-emerald-500/30">
                         {modelAnswer || '—'}
                       </div>
                     </div>
@@ -1506,14 +1508,143 @@ function HardEmojiInputs({
           </div>
         ))}
       </div>
-      <p className="mt-2 font-mono text-[10px] tracking-wider text-zinc-600 uppercase">
-        Press Ctrl / ⌘ + Enter to continue
-      </p>
+      <div className="flex items-center justify-between font-mono text-[10px] tracking-wider text-zinc-500 uppercase mt-2 px-1">
+        <span>Press Tab to move to next language</span>
+        <span>Ctrl / ⌘ + Enter to continue</span>
+      </div>
     </div>
   );
 }
 
+// ── Shared Auto-Expanding Textarea ──────────────────────────────
+function AutoExpandingTextarea({
+  minHeight = '4.5rem',
+  maxHeight = '18rem',
+  className = '',
+  value,
+  onChange,
+  onKeyDown,
+  placeholder,
+  id,
+  autoFocus,
+  spellCheck = false,
+}: {
+  minHeight?: string;
+  maxHeight?: string;
+  className?: string;
+  value: string;
+  onChange: (text: string) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  id?: string;
+  autoFocus?: boolean;
+  spellCheck?: boolean;
+}) {
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  const adjustHeight = React.useCallback(() => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  }, []);
+
+  React.useEffect(() => {
+    adjustHeight();
+  }, [value, adjustHeight]);
+
+  return (
+    <textarea
+      id={id}
+      ref={textareaRef}
+      autoFocus={autoFocus}
+      value={value}
+      onChange={(e) => {
+        onChange(e.target.value);
+        adjustHeight();
+      }}
+      onKeyDown={onKeyDown}
+      placeholder={placeholder}
+      spellCheck={spellCheck}
+      style={{ minHeight, maxHeight }}
+      className={`w-full rounded-lg border border-zinc-700/60 bg-zinc-900/70 px-3.5 py-2.5 text-sm leading-relaxed text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow] overflow-y-auto whitespace-pre-wrap ${className}`}
+    />
+  );
+}
+
 // ── Hard Q2: Who Am I? ──────────────────────────────────────────
+function parseQ2(val: string) {
+  if (!val) return { person: '', creation1: '', creation2: '' };
+
+  let currentSection: 'person' | 'creation1' | 'creation2' | null = null;
+  const sections: Record<'person' | 'creation1' | 'creation2', string[]> = {
+    person: [],
+    creation1: [],
+    creation2: [],
+  };
+
+  const lines = val.split('\n');
+  for (const line of lines) {
+    if (/^(?:={3,}.*?1\.\s*identity|\[.*?1\.\s*identity|person:)/i.test(line)) {
+      if (currentSection && sections[currentSection].length > 0 && sections[currentSection][sections[currentSection].length - 1] === '') {
+        sections[currentSection].pop();
+      }
+      currentSection = 'person';
+      if (/^person:\s*(.*)$/i.test(line)) {
+        const rem = line.replace(/^person:\s*/i, '');
+        if (rem) sections.person.push(rem);
+      }
+    } else if (/^(?:={3,}.*?2\.\s*creation\s*1|\[.*?2\.\s*creation\s*1|creation\s*1:)/i.test(line)) {
+      if (currentSection && sections[currentSection].length > 0 && sections[currentSection][sections[currentSection].length - 1] === '') {
+        sections[currentSection].pop();
+      }
+      currentSection = 'creation1';
+      if (/^creation\s*1:\s*(.*)$/i.test(line)) {
+        const rem = line.replace(/^creation\s*1:\s*/i, '');
+        if (rem) sections.creation1.push(rem);
+      }
+    } else if (/^(?:={3,}.*?3\.\s*creation\s*2|\[.*?3\.\s*creation\s*2|creation\s*2:)/i.test(line)) {
+      if (currentSection && sections[currentSection].length > 0 && sections[currentSection][sections[currentSection].length - 1] === '') {
+        sections[currentSection].pop();
+      }
+      currentSection = 'creation2';
+      if (/^creation\s*2:\s*(.*)$/i.test(line)) {
+        const rem = line.replace(/^creation\s*2:\s*/i, '');
+        if (rem) sections.creation2.push(rem);
+      }
+    } else if (currentSection) {
+      sections[currentSection].push(line);
+    }
+  }
+
+  if (currentSection && sections[currentSection].length > 0 && sections[currentSection][sections[currentSection].length - 1] === '') {
+    sections[currentSection].pop();
+  }
+
+  // Fallback if no headers found at all:
+  if (!sections.person.length && !sections.creation1.length && !sections.creation2.length && val.trim()) {
+    const parts = val.split('\n');
+    return { person: parts[0] || '', creation1: parts[1] || '', creation2: parts[2] || '' };
+  }
+
+  return {
+    person: sections.person.join('\n'),
+    creation1: sections.creation1.join('\n'),
+    creation2: sections.creation2.join('\n'),
+  };
+}
+
+function serializeQ2(fields: { person: string; creation1: string; creation2: string }) {
+  const hasAny = Boolean(fields.person || fields.creation1 || fields.creation2);
+  if (!hasAny) return '';
+  return [
+    `=== 1. IDENTITY ===\n${fields.person || ''}`,
+    `=== 2. CREATION 1 ===\n${fields.creation1 || ''}`,
+    `=== 3. CREATION 2 ===\n${fields.creation2 || ''}`,
+  ].join('\n\n');
+}
+
 function HardWhoAmIInputs({
   value,
   onChange,
@@ -1525,117 +1656,88 @@ function HardWhoAmIInputs({
   onSubmit: () => void;
   theme: QuizTheme;
 }) {
-  const parse = (val: string) => {
-    let person = '';
-    let creation1 = '';
-    let creation2 = '';
-    for (const line of val.split('\n')) {
-      if (/^person:\s*/i.test(line)) person = line.replace(/^person:\s*/i, '');
-      else if (/^creation 1:\s*/i.test(line)) creation1 = line.replace(/^creation 1:\s*/i, '');
-      else if (/^creation 2:\s*/i.test(line)) creation2 = line.replace(/^creation 2:\s*/i, '');
-    }
-    if (!person && !creation1 && !creation2 && val.trim()) {
-      const lines = val.split('\n');
-      person = lines[0] || '';
-      creation1 = lines[1] || '';
-      creation2 = lines[2] || '';
-    }
-    return { person, creation1, creation2 };
+  const [fields, setFields] = useState(() => parseQ2(value));
+
+  const update = (key: 'person' | 'creation1' | 'creation2', text: string) => {
+    const next = { ...fields, [key]: text };
+    setFields(next);
+    onChange(serializeQ2(next));
   };
 
-  const current = parse(value);
-
-  const update = (field: 'person' | 'creation1' | 'creation2', text: string) => {
-    const next = { ...current, [field]: text };
-    const serialized = [
-      `Person: ${next.person}`,
-      `Creation 1: ${next.creation1}`,
-      `Creation 2: ${next.creation2}`,
-    ].join('\n');
-    onChange(serialized);
+  const handleGlobalSubmitShortcut = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      onSubmit();
+    }
   };
 
   return (
-    <div className="mt-5 space-y-3">
-      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
-        <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1.5 flex items-center gap-1.5">
-          <span className={`font-bold ${theme.text}`}>1. Identity</span>
-          <span className="text-zinc-500">— Who am I?</span>
-        </label>
-        <input
-          type="text"
+    <div className="mt-5 space-y-4">
+      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4 transition-all focus-within:border-zinc-500">
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="q2-field-person" className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 flex items-center gap-1.5">
+            <span className={`font-bold ${theme.text}`}>1. Identity</span>
+            <span className="text-zinc-500">— Who am I?</span>
+          </label>
+          <span className="font-mono text-[10px] text-zinc-500 uppercase hidden sm:inline">Enter creates newline</span>
+        </div>
+        <AutoExpandingTextarea
+          id="q2-field-person"
           autoFocus={!value}
-          value={current.person}
-          onChange={(e) => update('person', e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              onSubmit();
-            }
-          }}
-          placeholder="Name of the person (creator)…"
-          className={[
-            'w-full rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3.5 py-2.5',
-            'text-sm font-mono text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow]',
-            theme.input,
-            theme.caret,
-          ].join(' ')}
+          minHeight="4.5rem"
+          maxHeight="14rem"
+          value={fields.person}
+          onChange={(text) => update('person', text)}
+          onKeyDown={handleGlobalSubmitShortcut}
+          placeholder="Name of the person (creator) and identity details… (Press Enter for next line)"
+          className={`${theme.input} ${theme.caret}`}
         />
       </div>
 
-      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
-        <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1.5 flex items-center gap-1.5">
-          <span className={`font-bold ${theme.text}`}>2. Creation 1</span>
-          <span className="text-zinc-500">— 1991 hobby project (servers & Android)</span>
-        </label>
-        <input
-          type="text"
-          value={current.creation1}
-          onChange={(e) => update('creation1', e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              onSubmit();
-            }
-          }}
-          placeholder="Name of the first creation / OS kernel…"
-          className={[
-            'w-full rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3.5 py-2.5',
-            'text-sm font-mono text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow]',
-            theme.input,
-            theme.caret,
-          ].join(' ')}
+      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4 transition-all focus-within:border-zinc-500">
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="q2-field-creation1" className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 flex items-center gap-1.5">
+            <span className={`font-bold ${theme.text}`}>2. Creation 1</span>
+            <span className="text-zinc-500">— 1991 hobby project (servers & Android)</span>
+          </label>
+          <span className="font-mono text-[10px] text-zinc-500 uppercase hidden sm:inline">Enter creates newline</span>
+        </div>
+        <AutoExpandingTextarea
+          id="q2-field-creation1"
+          minHeight="4.5rem"
+          maxHeight="14rem"
+          value={fields.creation1}
+          onChange={(text) => update('creation1', text)}
+          onKeyDown={handleGlobalSubmitShortcut}
+          placeholder="Name of the first creation / OS kernel and details… (Press Enter for next line)"
+          className={`${theme.input} ${theme.caret}`}
         />
       </div>
 
-      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
-        <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1.5 flex items-center gap-1.5">
-          <span className={`font-bold ${theme.text}`}>3. Creation 2</span>
-          <span className="text-zinc-500">— Version control tool used on GitHub</span>
-        </label>
-        <input
-          type="text"
-          value={current.creation2}
-          onChange={(e) => update('creation2', e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              onSubmit();
-            }
-          }}
-          placeholder="Name of the version control tool…"
-          className={[
-            'w-full rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3.5 py-2.5',
-            'text-sm font-mono text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow]',
-            theme.input,
-            theme.caret,
-          ].join(' ')}
+      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4 transition-all focus-within:border-zinc-500">
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="q2-field-creation2" className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 flex items-center gap-1.5">
+            <span className={`font-bold ${theme.text}`}>3. Creation 2</span>
+            <span className="text-zinc-500">— Version control tool used on GitHub</span>
+          </label>
+          <span className="font-mono text-[10px] text-zinc-500 uppercase hidden sm:inline">Enter creates newline</span>
+        </div>
+        <AutoExpandingTextarea
+          id="q2-field-creation2"
+          minHeight="4.5rem"
+          maxHeight="14rem"
+          value={fields.creation2}
+          onChange={(text) => update('creation2', text)}
+          onKeyDown={handleGlobalSubmitShortcut}
+          placeholder="Name of the version control tool and details… (Press Enter for next line)"
+          className={`${theme.input} ${theme.caret}`}
         />
       </div>
 
-      <p className="mt-2 font-mono text-[10px] tracking-wider text-zinc-600 uppercase">
-        Press Ctrl / ⌘ + Enter to continue
-      </p>
+      <div className="flex items-center justify-between font-mono text-[10px] tracking-wider text-zinc-500 uppercase mt-2 px-1">
+        <span>Enter: Next line in box · Tab: Next field</span>
+        <span>Ctrl / ⌘ + Enter to continue</span>
+      </div>
     </div>
   );
 }
@@ -1688,6 +1790,83 @@ function HardPuzzleInput({
 }
 
 // ── Hard Q4: Binary Search Bugs ─────────────────────────────────
+function parseQ4(val: string) {
+  if (!val) return { bug1: '', bug2: '', hangs: '', wrong: '' };
+
+  let currentSection: 'bug1' | 'bug2' | 'hangs' | 'wrong' | null = null;
+  const sections: Record<'bug1' | 'bug2' | 'hangs' | 'wrong', string[]> = {
+    bug1: [],
+    bug2: [],
+    hangs: [],
+    wrong: [],
+  };
+
+  const lines = val.split('\n');
+  for (const line of lines) {
+    if (/^(?:={3,}.*?bug\s*1|\[.*?bug\s*1|bug\s*1:)/i.test(line)) {
+      if (currentSection && sections[currentSection].length > 0 && sections[currentSection][sections[currentSection].length - 1] === '') {
+        sections[currentSection].pop();
+      }
+      currentSection = 'bug1';
+      if (/^bug\s*1:\s*(.*)$/i.test(line)) {
+        const text = line.replace(/^bug\s*1:\s*/i, '');
+        if (text) sections.bug1.push(text);
+      }
+    } else if (/^(?:={3,}.*?bug\s*2|\[.*?bug\s*2|bug\s*2:)/i.test(line)) {
+      if (currentSection && sections[currentSection].length > 0 && sections[currentSection][sections[currentSection].length - 1] === '') {
+        sections[currentSection].pop();
+      }
+      currentSection = 'bug2';
+      if (/^bug\s*2:\s*(.*)$/i.test(line)) {
+        const text = line.replace(/^bug\s*2:\s*/i, '');
+        if (text) sections.bug2.push(text);
+      }
+    } else if (/^(?:={3,}.*?hangs|\[.*?hangs|input\s*(?:that)?\s*hangs:)/i.test(line)) {
+      if (currentSection && sections[currentSection].length > 0 && sections[currentSection][sections[currentSection].length - 1] === '') {
+        sections[currentSection].pop();
+      }
+      currentSection = 'hangs';
+      if (/^input\s*(?:that)?\s*hangs:\s*(.*)$/i.test(line)) {
+        const text = line.replace(/^input\s*(?:that)?\s*hangs:\s*/i, '');
+        if (text) sections.hangs.push(text);
+      }
+    } else if (/^(?:={3,}.*?wrong|\[.*?wrong|input\s*(?:with)?\s*wrong(?:\s*answer)?:)/i.test(line)) {
+      if (currentSection && sections[currentSection].length > 0 && sections[currentSection][sections[currentSection].length - 1] === '') {
+        sections[currentSection].pop();
+      }
+      currentSection = 'wrong';
+      if (/^input\s*(?:with)?\s*wrong(?:\s*answer)?:\s*(.*)$/i.test(line)) {
+        const text = line.replace(/^input\s*(?:with)?\s*wrong(?:\s*answer)?:\s*/i, '');
+        if (text) sections.wrong.push(text);
+      }
+    } else if (currentSection) {
+      sections[currentSection].push(line);
+    }
+  }
+
+  if (currentSection && sections[currentSection].length > 0 && sections[currentSection][sections[currentSection].length - 1] === '') {
+    sections[currentSection].pop();
+  }
+
+  return {
+    bug1: sections.bug1.join('\n'),
+    bug2: sections.bug2.join('\n'),
+    hangs: sections.hangs.join('\n'),
+    wrong: sections.wrong.join('\n'),
+  };
+}
+
+function serializeQ4(fields: { bug1: string; bug2: string; hangs: string; wrong: string }) {
+  const hasAny = Boolean(fields.bug1 || fields.bug2 || fields.hangs || fields.wrong);
+  if (!hasAny) return '';
+  return [
+    `=== BUG 1: SEARCH BOUNDS & INFINITE LOOP ===\n${fields.bug1 || ''}`,
+    `=== BUG 2: LOOP TERMINATION & SKIPPED CASE ===\n${fields.bug2 || ''}`,
+    `=== INPUT THAT HANGS ===\n${fields.hangs || ''}`,
+    `=== INPUT WITH WRONG ANSWER ===\n${fields.wrong || ''}`,
+  ].join('\n\n');
+}
+
 function HardBinarySearchInputs({
   value,
   onChange,
@@ -1699,126 +1878,106 @@ function HardBinarySearchInputs({
   onSubmit: () => void;
   theme: QuizTheme;
 }) {
-  const parse = (val: string) => {
-    let bug1 = '';
-    let bug2 = '';
-    let hangs = '';
-    let wrong = '';
-    for (const line of val.split('\n')) {
-      if (/^bug 1:\s*/i.test(line)) bug1 = line.replace(/^bug 1:\s*/i, '');
-      else if (/^bug 2:\s*/i.test(line)) bug2 = line.replace(/^bug 2:\s*/i, '');
-      else if (/^input that hangs:\s*/i.test(line)) hangs = line.replace(/^input that hangs:\s*/i, '');
-      else if (/^input with wrong answer:\s*/i.test(line)) wrong = line.replace(/^input with wrong answer:\s*/i, '');
-    }
-    return { bug1, bug2, hangs, wrong };
+  const [fields, setFields] = useState(() => parseQ4(value));
+
+  const update = (key: 'bug1' | 'bug2' | 'hangs' | 'wrong', text: string) => {
+    const next = { ...fields, [key]: text };
+    setFields(next);
+    onChange(serializeQ4(next));
   };
 
-  const current = parse(value);
-
-  const update = (field: 'bug1' | 'bug2' | 'hangs' | 'wrong', text: string) => {
-    const next = { ...current, [field]: text };
-    const serialized = [
-      `Bug 1: ${next.bug1}`,
-      `Bug 2: ${next.bug2}`,
-      `Input that hangs: ${next.hangs}`,
-      `Input with wrong answer: ${next.wrong}`,
-    ].join('\n');
-    onChange(serialized);
+  const handleGlobalSubmitShortcut = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      onSubmit();
+    }
   };
 
   return (
-    <div className="mt-5 space-y-3">
-      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
-        <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1 flex items-center gap-1.5">
-          <span className={`font-bold ${theme.text}`}>Bug 1</span>
-          <span className="text-zinc-500">— Search bounds & infinite loop</span>
-        </label>
-        <textarea
-          rows={2}
-          value={current.bug1}
-          onChange={(e) => update('bug1', e.target.value)}
-          placeholder="Describe Bug 1 (e.g. how low or high are updated, causing an infinite loop)…"
-          className={[
-            'w-full rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3.5 py-2',
-            'text-sm text-zinc-50 placeholder:text-zinc-600 outline-none resize-none transition-[border-color,box-shadow]',
-            theme.input,
-            theme.caret,
-          ].join(' ')}
+    <div className="mt-5 space-y-4">
+      {/* Bug 1: Long-form Technical Area */}
+      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4 transition-all focus-within:border-zinc-500">
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="q4-bug1" className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 flex items-center gap-1.5">
+            <span className={`font-bold ${theme.text}`}>Bug 1: Search Bounds & Infinite Loop</span>
+            <span className="text-zinc-500">— Analysis & Fix</span>
+          </label>
+          <span className="font-mono text-[10px] text-zinc-500 uppercase hidden sm:inline">Enter creates newline for code</span>
+        </div>
+        <AutoExpandingTextarea
+          id="q4-bug1"
+          minHeight="7rem"
+          maxHeight="22rem"
+          value={fields.bug1}
+          onChange={(text) => update('bug1', text)}
+          onKeyDown={handleGlobalSubmitShortcut}
+          placeholder={`Explain Bug 1 in detail:\n• State the line of code and what is wrong (e.g. low = mid / high = mid)\n• Explain how integer division causes an infinite loop\n• Provide the corrected code:\n    elif arr[mid] < target:\n        low = mid + 1\n    else:\n        high = mid - 1`}
+          className={`font-mono text-xs sm:text-sm ${theme.input} ${theme.caret}`}
         />
       </div>
 
-      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
-        <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1 flex items-center gap-1.5">
-          <span className={`font-bold ${theme.text}`}>Bug 2</span>
-          <span className="text-zinc-500">— Loop termination & skipped case</span>
-        </label>
-        <textarea
-          rows={2}
-          value={current.bug2}
-          onChange={(e) => update('bug2', e.target.value)}
-          placeholder="Describe Bug 2 (e.g. while loop condition when 1 element remains)…"
-          className={[
-            'w-full rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3.5 py-2',
-            'text-sm text-zinc-50 placeholder:text-zinc-600 outline-none resize-none transition-[border-color,box-shadow]',
-            theme.input,
-            theme.caret,
-          ].join(' ')}
+      {/* Bug 2: Long-form Technical Area */}
+      <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4 transition-all focus-within:border-zinc-500">
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="q4-bug2" className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 flex items-center gap-1.5">
+            <span className={`font-bold ${theme.text}`}>Bug 2: Loop Termination & Skipped Elements</span>
+            <span className="text-zinc-500">— Analysis & Fix</span>
+          </label>
+          <span className="font-mono text-[10px] text-zinc-500 uppercase hidden sm:inline">Enter creates newline for code</span>
+        </div>
+        <AutoExpandingTextarea
+          id="q4-bug2"
+          minHeight="7rem"
+          maxHeight="22rem"
+          value={fields.bug2}
+          onChange={(text) => update('bug2', text)}
+          onKeyDown={handleGlobalSubmitShortcut}
+          placeholder={`Explain Bug 2 in detail:\n• State the while condition issue (e.g. while low < high vs while low <= high)\n• Explain why single-element arrays or the final candidate are skipped\n• Provide the corrected loop condition:\n    while low <= high:`}
+          className={`font-mono text-xs sm:text-sm ${theme.input} ${theme.caret}`}
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
-          <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1 flex items-center gap-1.5">
+      {/* Inputs that trigger the bugs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4 transition-all focus-within:border-zinc-500">
+          <label htmlFor="q4-input-hangs" className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-2 flex items-center gap-1.5">
             <span className={`font-bold ${theme.text}`}>Input That Hangs</span>
+            <span className="text-zinc-500 text-[10px]">(Infinite Loop)</span>
           </label>
-          <input
-            type="text"
-            value={current.hangs}
-            onChange={(e) => update('hangs', e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                onSubmit();
-              }
-            }}
-            placeholder="e.g. binary_search([1, 3, 5, 7], 7)"
-            className={[
-              'w-full font-mono rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3 py-2',
-              'text-xs sm:text-sm text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow]',
-              theme.input,
-              theme.caret,
-            ].join(' ')}
+          <AutoExpandingTextarea
+            id="q4-input-hangs"
+            minHeight="4.5rem"
+            maxHeight="12rem"
+            value={fields.hangs}
+            onChange={(text) => update('hangs', text)}
+            onKeyDown={handleGlobalSubmitShortcut}
+            placeholder={`e.g. arr = [1, 3, 5, 7], target = 7\nbinary_search(arr, target)`}
+            className={`font-mono text-xs sm:text-sm ${theme.input} ${theme.caret}`}
           />
         </div>
 
-        <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4">
-          <label className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-1 flex items-center gap-1.5">
+        <div className="rounded-xl border border-zinc-700/60 bg-zinc-950/70 p-4 transition-all focus-within:border-zinc-500">
+          <label htmlFor="q4-input-wrong" className="block font-mono text-[11px] tracking-wider uppercase text-zinc-300 mb-2 flex items-center gap-1.5">
             <span className={`font-bold ${theme.text}`}>Input With Wrong Answer</span>
+            <span className="text-zinc-500 text-[10px]">(False -1)</span>
           </label>
-          <input
-            type="text"
-            value={current.wrong}
-            onChange={(e) => update('wrong', e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                onSubmit();
-              }
-            }}
-            placeholder="e.g. binary_search([5], 5)"
-            className={[
-              'w-full font-mono rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-3 py-2',
-              'text-xs sm:text-sm text-zinc-50 placeholder:text-zinc-600 outline-none transition-[border-color,box-shadow]',
-              theme.input,
-              theme.caret,
-            ].join(' ')}
+          <AutoExpandingTextarea
+            id="q4-input-wrong"
+            minHeight="4.5rem"
+            maxHeight="12rem"
+            value={fields.wrong}
+            onChange={(text) => update('wrong', text)}
+            onKeyDown={handleGlobalSubmitShortcut}
+            placeholder={`e.g. arr = [5], target = 5\nbinary_search(arr, target)`}
+            className={`font-mono text-xs sm:text-sm ${theme.input} ${theme.caret}`}
           />
         </div>
       </div>
 
-      <p className="mt-2 font-mono text-[10px] tracking-wider text-zinc-600 uppercase">
-        Press Ctrl / ⌘ + Enter to continue
-      </p>
+      <div className="flex items-center justify-between font-mono text-[10px] tracking-wider text-zinc-500 uppercase mt-2 px-1">
+        <span>Enter: Next line inside box (code, gap & newlines) · Tab: Next field</span>
+        <span>Ctrl / ⌘ + Enter to continue</span>
+      </div>
     </div>
   );
 }
