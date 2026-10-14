@@ -2,7 +2,6 @@ import 'server-only';
 import { MongoClient, type Collection } from 'mongodb';
 import { DifficultyId } from '../../types/difficulty';
 import { EvaluatorDecision, EvaluatorGradeRecord } from '../../types/quiz';
-export type { EvaluatorDecision, EvaluatorGradeRecord };
 
 /**
  * MongoDB access — SERVER ONLY

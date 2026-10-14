@@ -1,5 +1,6 @@
 import { isRequestAuthorizedAsEvaluator } from '../../../lib/server/evaluatorAuth';
-import { saveEvaluatorGrade, EvaluatorDecision } from '../../../lib/server/db';
+import { saveEvaluatorGrade } from '../../../lib/server/db';
+import { EvaluatorDecision } from '../../../types/quiz';
 
 /**
  * POST /api/evaluator/grade
