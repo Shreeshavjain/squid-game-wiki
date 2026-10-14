@@ -1,13 +1,14 @@
 import { isRequestAuthorizedAsEvaluator } from '../../../lib/server/evaluatorAuth';
-import { saveEvaluatorGrade } from '../../../lib/server/db';
+import { saveEvaluatorGrade, saveAllEvaluatorGrades } from '../../../lib/server/db';
 import { EvaluatorDecision } from '../../../types/quiz';
 
 /**
  * POST /api/evaluator/grade
- * Body: { teamName: '...', questionId: 'q1', decision: 'correct' | 'wrong' | 'ungraded' }
+ * Batch Body:  { teamName: '...', decisions: { q1: 'correct', q2: 'wrong', ... } }
+ * Single Body: { teamName: '...', questionId: 'q1', decision: 'correct' | 'wrong' | 'ungraded' }
  *
- * Saves an evaluator's manual decision for a question, recomputes total score
- * from the five question decisions, and updates MongoDB immediately.
+ * Saves evaluator manual decision(s), recomputes total score across all 5 questions,
+ * and updates MongoDB immediately. Unmarked questions default to 0 points.
  */
 export async function POST(request: Request) {
   if (!isRequestAuthorizedAsEvaluator(request)) {
@@ -15,12 +16,27 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { teamName, questionId, decision } = await request.json();
+    const body = await request.json();
+    const { teamName, questionId, decision, decisions } = body;
 
     if (!teamName || typeof teamName !== 'string' || !teamName.trim()) {
       return Response.json({ error: 'Missing teamName' }, { status: 400 });
     }
 
+    // Batch evaluation (Save All Evaluations)
+    if (decisions && typeof decisions === 'object') {
+      const result = await saveAllEvaluatorGrades(teamName, decisions);
+      if (!result.success) {
+        return Response.json({ error: result.error || 'Failed to save grades' }, { status: 400 });
+      }
+      return Response.json({
+        ok: true,
+        newScore: result.newScore,
+        evaluatorGrades: result.evaluatorGrades,
+      });
+    }
+
+    // Single question fallback
     if (!questionId || typeof questionId !== 'string' || !['q1', 'q2', 'q3', 'q4', 'q5'].includes(questionId)) {
       return Response.json({ error: 'Invalid questionId' }, { status: 400 });
     }

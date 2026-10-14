@@ -178,15 +178,29 @@ export function QuizRunner({ tier, quizTitle, questions, scoreEndpoint, allowSki
     setDraft(null);
   };
 
-  const handleEvaluatorScoreUpdate = (newScore: number, questionId?: string, decision?: EvaluatorDecision) => {
+  const handleEvaluatorScoreUpdate = (
+    newScore: number,
+    decisionsOrQuestionId?: Record<string, EvaluatorDecision> | string,
+    singleDecision?: EvaluatorDecision
+  ) => {
     if (progress) {
       const nextResults = { ...(progress.results || {}) };
-      if (questionId && decision) {
-        const points = decision === 'correct' ? 30 : decision === 'wrong' ? -20 : 0;
-        nextResults[questionId] = {
+      if (typeof decisionsOrQuestionId === 'object' && decisionsOrQuestionId !== null) {
+        for (const [qid, dec] of Object.entries(decisionsOrQuestionId)) {
+          const points = dec === 'correct' ? 30 : dec === 'wrong' ? -20 : 0;
+          nextResults[qid] = {
+            correct: points > 0,
+            points,
+            skipped: dec === 'ungraded',
+            needsReview: false,
+          };
+        }
+      } else if (typeof decisionsOrQuestionId === 'string' && singleDecision) {
+        const points = singleDecision === 'correct' ? 30 : singleDecision === 'wrong' ? -20 : 0;
+        nextResults[decisionsOrQuestionId] = {
           correct: points > 0,
           points,
-          skipped: decision === 'ungraded',
+          skipped: singleDecision === 'ungraded',
           needsReview: false,
         };
       }
@@ -617,8 +631,17 @@ function HardResultsSection({
 
   // Per-question point editing state
   const [editingPoints, setEditingPoints] = useState<Record<string, string>>({});
-  const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<{ qid: string; ok: boolean; msg: string } | null>(null);
+  const [isSavingAll, setIsSavingAll] = useState(false);
+  const [globalSaveStatus, setGlobalSaveStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const currentTotalScore = questions.reduce((sum, q) => {
+    const rawVal = editingPoints[q.id];
+    if (rawVal === '30') return sum + 30;
+    if (rawVal === '-20') return sum - 20;
+    if (rawVal === '0') return sum + 0;
+    const existingPts = currentProgress.results?.[q.id]?.points;
+    return sum + (typeof existingPts === 'number' ? existingPts : 0);
+  }, 0);
 
   const progressRef = React.useRef(progress);
   useEffect(() => {
@@ -692,66 +715,79 @@ function HardResultsSection({
     }
   };
 
-  const handleSaveCorrection = async (questionId: string) => {
-    const rawVal = editingPoints[questionId];
-    if (rawVal === undefined || rawVal.trim() === '') {
-      setStatusMessage({ qid: questionId, ok: false, msg: 'Please enter points' });
-      return;
-    }
-    const pointsNum = Number(rawVal);
-    if (!Number.isFinite(pointsNum)) {
-      setStatusMessage({ qid: questionId, ok: false, msg: 'Invalid number' });
-      return;
+  const handleSaveAll = async () => {
+    if (isSavingAll) return;
+    setIsSavingAll(true);
+    setGlobalSaveStatus(null);
+
+    const decisionsMap: Record<string, EvaluatorDecision> = {};
+    const nextResults = { ...(currentProgress.results || {}) };
+    let totalPts = 0;
+
+    for (const q of questions) {
+      const rawVal = editingPoints[q.id];
+      let dec: EvaluatorDecision = 'ungraded';
+      let pts = 0;
+      if (rawVal === '30') {
+        dec = 'correct';
+        pts = 30;
+      } else if (rawVal === '-20') {
+        dec = 'wrong';
+        pts = -20;
+      } else if (rawVal === '0') {
+        dec = 'ungraded';
+        pts = 0;
+      } else if (currentProgress.results?.[q.id]?.points !== undefined) {
+        pts = currentProgress.results[q.id].points;
+        dec = pts > 0 ? 'correct' : pts < 0 ? 'wrong' : 'ungraded';
+      }
+
+      decisionsMap[q.id] = dec;
+      totalPts += pts;
+      nextResults[q.id] = {
+        ...nextResults[q.id],
+        correct: pts > 0,
+        points: pts,
+        skipped: dec === 'ungraded',
+        needsReview: false,
+      };
     }
 
-    setSavingQuestionId(questionId);
-    setStatusMessage(null);
     try {
       const res = await fetch('/api/quiz/hard/correct', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           teamName,
-          questionId,
-          correctedPoints: pointsNum,
           organizerKey,
+          decisions: decisionsMap,
         }),
       });
+
       const data = await res.json();
       if (!res.ok) {
-        setStatusMessage({ qid: questionId, ok: false, msg: data.error || 'Failed to save' });
+        setGlobalSaveStatus({ ok: false, msg: data.error || 'Failed to save evaluations' });
         if (res.status === 403) {
           setIsAuthorized(false);
           setAuthError('Organizer authorization failed. Please re-enter passphrase.');
         }
       } else {
-        const prevResults = currentProgress.results ?? {};
-        const updatedResults = {
-          ...prevResults,
-          [questionId]: {
-            ...prevResults[questionId],
-            points: pointsNum,
-            correct: pointsNum > 0,
-            skipped: false,
-            needsReview: false,
-          },
-        };
+        const newScore = typeof data.newScore === 'number' ? data.newScore : totalPts;
         const updated: QuizProgress = {
           ...currentProgress,
-          score: data.newScore,
-          results: updatedResults,
+          score: newScore,
+          results: nextResults,
         };
         onUpdateProgress?.(updated);
-        setStatusMessage({
-          qid: questionId,
+        setGlobalSaveStatus({
           ok: true,
-          msg: `Score updated: ${pointsNum >= 0 ? `+${pointsNum}` : pointsNum} pts (New total: ${data.newScore})`,
+          msg: `All evaluations saved successfully! New Total Score: ${newScore >= 0 ? `+${newScore}` : newScore} pts`,
         });
       }
     } catch {
-      setStatusMessage({ qid: questionId, ok: false, msg: 'Network error saving correction' });
+      setGlobalSaveStatus({ ok: false, msg: 'Network error saving evaluations' });
     } finally {
-      setSavingQuestionId(null);
+      setIsSavingAll(false);
     }
   };
 
@@ -775,11 +811,16 @@ function HardResultsSection({
       <div className="mt-6 inline-flex flex-col items-center rounded-2xl border border-rose-500/40 bg-zinc-950/80 px-10 py-5 shadow-[0_0_30px_rgba(244,63,94,0.15)]">
         <span className="font-mono text-[10px] tracking-[0.3em] uppercase text-zinc-400">Total Score</span>
         <span
-          className={`mt-1 text-5xl font-black tabular-nums ${(currentProgress.score ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}
+          className={`mt-1 text-5xl font-black tabular-nums transition-colors duration-200 ${(isAuthorized ? currentTotalScore : (currentProgress.score ?? 0)) >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}
         >
-          {currentProgress.score ?? 0}
+          {isAuthorized ? currentTotalScore : (currentProgress.score ?? 0)}
         </span>
         <span className="mt-1 font-mono text-xs text-zinc-500">out of {currentProgress.maxScore ?? 150}</span>
+        {isAuthorized && (
+          <span className="mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30 animate-pulse">
+            ● Live Score Preview
+          </span>
+        )}
       </div>
 
       {/* Organizer Mode Toggle Button */}
@@ -874,14 +915,30 @@ function HardResultsSection({
             const result = currentProgress.results?.[q.id];
             const participantAnswer = currentProgress.answers[q.id];
             const modelAnswer = currentProgress.modelAnswers?.[q.id];
-            const points = result?.points ?? 0;
-            const outcome = result?.needsReview
+
+            // Lively calculate points & outcome as evaluator toggles choices
+            const activeChoice = isAuthorized ? editingPoints[q.id] : undefined;
+            const points = activeChoice === '30'
+              ? 30
+              : activeChoice === '-20'
+              ? -20
+              : activeChoice === '0'
+              ? 0
+              : (result?.points ?? 0);
+
+            const outcome = activeChoice === '30'
+              ? 'correct'
+              : activeChoice === '-20'
+              ? 'wrong'
+              : activeChoice === '0'
+              ? 'skipped'
+              : result?.needsReview
               ? 'needs review'
               : result?.skipped
               ? 'skipped'
               : result?.correct
               ? 'correct'
-              : 'wrong';
+              : (result?.points !== undefined ? 'wrong' : 'skipped');
 
             return (
               <li
@@ -896,8 +953,8 @@ function HardResultsSection({
                   </div>
                   <div className="flex items-center gap-2">
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold ${
-                        result?.needsReview
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold transition-all duration-200 ${
+                        activeChoice === undefined && result?.needsReview
                           ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                           : points > 0
                           ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
@@ -906,10 +963,10 @@ function HardResultsSection({
                           : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
                       }`}
                     >
-                      {result?.needsReview ? 'Pending Review' : points > 0 ? `+${points} pts` : `${points} pts`}
+                      {activeChoice === undefined && result?.needsReview ? 'Pending Review' : points > 0 ? `+${points} pts` : `${points} pts`}
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider font-bold ${
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider font-bold transition-all duration-200 ${
                         outcome === 'correct'
                           ? 'bg-emerald-400 text-zinc-950'
                           : outcome === 'wrong'
@@ -973,83 +1030,166 @@ function HardResultsSection({
                   </div>
                 </div>
 
-                {/* Organizer Correction Row if authorized */}
-                {isAuthorized && (
-                  <div className="px-5 py-3 border-t border-amber-500/25 bg-amber-950/15">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                {/* Evaluator Choice Selector if authorized */}
+                {isAuthorized && (() => {
+                  const currentSelected = editingPoints[q.id] !== undefined
+                    ? editingPoints[q.id]
+                    : points > 0 ? '30' : points < 0 ? '-20' : '0';
+
+                  return (
+                    <div className="px-5 py-3 border-t border-amber-500/25 bg-amber-950/20 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-[11px] font-bold text-amber-400 uppercase tracking-wider">
-                          Adjust Points:
+                          Evaluation:
                         </span>
-                        {/* Quick Presets */}
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setEditingPoints((prev) => ({ ...prev, [q.id]: '30' }))
-                            }
-                            className="px-2 py-1 rounded bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] hover:bg-emerald-900/60"
-                          >
-                            +30 (Full)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setEditingPoints((prev) => ({ ...prev, [q.id]: '0' }))
-                            }
-                            className="px-2 py-1 rounded bg-zinc-900 border border-zinc-700 text-zinc-300 font-mono text-[10px] hover:bg-zinc-800"
-                          >
-                            0 (Zero)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setEditingPoints((prev) => ({ ...prev, [q.id]: '-20' }))
-                            }
-                            className="px-2 py-1 rounded bg-rose-950/60 border border-rose-500/40 text-rose-300 font-mono text-[10px] hover:bg-rose-900/60"
-                          >
-                            -20 (Wrong)
-                          </button>
-                        </div>
+                        <span className="text-zinc-500 text-xs hidden sm:inline">Select decision for Q{i + 1}</span>
                       </div>
 
+                      {/* 3 Choice Buttons ONLY - No per-question save */}
                       <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          value={editingPoints[q.id] ?? String(points)}
-                          onChange={(e) =>
-                            setEditingPoints((prev) => ({ ...prev, [q.id]: e.target.value }))
-                          }
-                          className="w-20 px-2.5 py-1 rounded bg-zinc-900 border border-amber-500/40 font-mono text-xs text-zinc-100 text-center focus:outline-none focus:border-amber-400"
-                        />
                         <button
                           type="button"
-                          disabled={savingQuestionId === q.id}
-                          onClick={() => handleSaveCorrection(q.id)}
-                          className="px-3 py-1 rounded bg-amber-500 text-zinc-950 font-mono text-xs font-bold uppercase tracking-wider hover:bg-amber-400 disabled:opacity-50 transition-colors"
+                          onClick={() => setEditingPoints((prev) => ({ ...prev, [q.id]: '30' }))}
+                          className={`px-3 py-1.5 rounded-lg font-mono text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            currentSelected === '30'
+                              ? 'bg-emerald-500 text-zinc-950 ring-2 ring-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.4)]'
+                              : 'bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/50'
+                          }`}
                         >
-                          {savingQuestionId === q.id ? 'Saving…' : 'Save'}
+                          <span>✓</span>
+                          <span>+30 Correct</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setEditingPoints((prev) => ({ ...prev, [q.id]: '0' }))}
+                          className={`px-3 py-1.5 rounded-lg font-mono text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            currentSelected === '0'
+                              ? 'bg-zinc-200 text-zinc-950 ring-2 ring-zinc-400 shadow-[0_0_12px_rgba(255,255,255,0.2)]'
+                              : 'bg-zinc-900 border border-zinc-700 text-zinc-400 hover:bg-zinc-800'
+                          }`}
+                        >
+                          <span>—</span>
+                          <span>0 Unmarked / Skipped</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setEditingPoints((prev) => ({ ...prev, [q.id]: '-20' }))}
+                          className={`px-3 py-1.5 rounded-lg font-mono text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            currentSelected === '-20'
+                              ? 'bg-rose-500 text-white ring-2 ring-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.4)]'
+                              : 'bg-rose-950/50 border border-rose-500/40 text-rose-300 hover:bg-rose-900/50'
+                          }`}
+                        >
+                          <span>✗</span>
+                          <span>-20 Wrong</span>
                         </button>
                       </div>
                     </div>
-
-                    {statusMessage && statusMessage.qid === q.id && (
-                      <p
-                        role="alert"
-                        className={`mt-2 font-mono text-xs ${
-                          statusMessage.ok ? 'text-emerald-400' : 'text-rose-400'
-                        }`}
-                      >
-                        {statusMessage.ok ? '✓ ' : '✗ '}
-                        {statusMessage.msg}
-                      </p>
-                    )}
-                  </div>
-                )}
+                  );
+                })()}
               </li>
             );
           })}
         </ol>
+
+        {/* Universal Save All Section at the bottom */}
+        {isAuthorized && (
+          <div className="mt-8 rounded-2xl border-2 border-amber-500/50 bg-gradient-to-b from-amber-950/40 to-zinc-950 p-6 text-center shadow-[0_0_40px_rgba(245,158,11,0.2)]">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-left space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-bold uppercase tracking-widest text-amber-400">
+                    Universal Batch Save
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    5 of 5 Ready
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400">
+                  Projected Total Score:{' '}
+                  <span
+                    className={`font-mono font-black text-sm ${
+                      currentTotalScore >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {currentTotalScore >= 0 ? `+${currentTotalScore}` : currentTotalScore} pts
+                  </span>
+                  <span className="text-zinc-500 text-[11px] ml-1">/ 150</span>
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                {/* Secondary Action: Return to locked control view for players (Left of Save) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAuthorized(false);
+                    setShowOrganizerPanel(false);
+                    setOrganizerKey('');
+                  }}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-lg border border-zinc-700/80 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 font-mono text-[11px] font-semibold uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:border-zinc-500"
+                  title="Lock controls and return to clean player results view"
+                >
+                  <span className="text-xs">🔒</span>
+                  <span>Exit to Player View</span>
+                </button>
+
+                {/* Primary Action: Save All Evaluations */}
+                <button
+                  type="button"
+                  disabled={isSavingAll}
+                  onClick={handleSaveAll}
+                  className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-zinc-950 font-mono text-sm font-black uppercase tracking-widest hover:from-amber-400 hover:to-amber-300 disabled:opacity-50 transition-all shadow-lg shadow-amber-500/30 active:scale-95 flex items-center justify-center gap-2.5 cursor-pointer"
+                >
+                  {isSavingAll ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-zinc-950" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      <span>SAVING ALL…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>💾</span>
+                      <span>SAVE ALL EVALUATIONS</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {globalSaveStatus && (
+              <div
+                role="alert"
+                className={`mt-4 p-3 rounded-lg font-mono text-xs text-center border ${
+                  globalSaveStatus.ok
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                    : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+                  <span>{globalSaveStatus.ok ? '✓ ' : '✗ '} {globalSaveStatus.msg}</span>
+                  {globalSaveStatus.ok && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAuthorized(false);
+                        setShowOrganizerPanel(false);
+                        setOrganizerKey('');
+                      }}
+                      className="underline font-bold text-emerald-200 hover:text-white ml-2 cursor-pointer"
+                    >
+                      Return to Player View now →
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

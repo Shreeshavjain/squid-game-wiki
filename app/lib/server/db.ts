@@ -342,4 +342,64 @@ export async function saveEvaluatorGrade(
   return { success: true, newScore: totalScore, evaluatorGrades: updatedGrades };
 }
 
+/**
+ * Saves all evaluator manual decisions for Hard quiz questions in a single operation.
+ * Correct = +30 points, Wrong = -20 points, Unmarked/Ungraded = 0 points.
+ * Total score is recomputed from the 5 decisions and persisted to MongoDB.
+ */
+export async function saveAllEvaluatorGrades(
+  teamName: string,
+  decisions: Record<string, EvaluatorDecision>
+): Promise<{
+  success: boolean;
+  newScore?: number;
+  evaluatorGrades?: Record<string, EvaluatorGradeRecord>;
+  error?: string;
+}> {
+  const col = await teams();
+  const team = await col.findOne({ teamKey: toTeamKey(teamName) });
+  if (!team) return { success: false, error: 'Team not found' };
+
+  const HARD_QUESTION_IDS = ['q1', 'q2', 'q3', 'q4', 'q5'];
+  const updatedGrades: Record<string, EvaluatorGradeRecord> = { ...(team.evaluatorGrades || {}) };
+
+  let totalScore = 0;
+  const updatedAutoResults: Record<string, QuestionResult> = { ...(team.autoResults || {}) };
+
+  for (const qid of HARD_QUESTION_IDS) {
+    const rawDecision = decisions[qid];
+    const decision: EvaluatorDecision =
+      rawDecision === 'correct' ? 'correct' : rawDecision === 'wrong' ? 'wrong' : 'ungraded';
+    const points = decision === 'correct' ? 30 : decision === 'wrong' ? -20 : 0;
+
+    updatedGrades[qid] = {
+      decision,
+      points,
+      evaluatedAt: new Date(),
+    };
+
+    totalScore += points;
+    updatedAutoResults[qid] = {
+      correct: points > 0,
+      points,
+      skipped: decision === 'ungraded',
+      needsReview: false,
+    };
+  }
+
+  await col.updateOne(
+    { teamKey: toTeamKey(teamName) },
+    {
+      $set: {
+        evaluatorGrades: updatedGrades,
+        autoResults: updatedAutoResults,
+        score: totalScore,
+        maxScore: 150,
+      },
+    }
+  );
+
+  return { success: true, newScore: totalScore, evaluatorGrades: updatedGrades };
+}
+
 

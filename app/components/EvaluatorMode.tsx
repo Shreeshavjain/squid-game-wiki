@@ -7,7 +7,11 @@ import { QuestionSummary } from './QuizRunner';
 interface EvaluatorModeProps {
   teamName: string;
   questions: readonly QuizQuestion[];
-  onScoreUpdated?: (newScore: number, questionId?: string, decision?: EvaluatorDecision) => void;
+  onScoreUpdated?: (
+    newScore: number,
+    decisionsOrQuestionId?: Record<string, EvaluatorDecision> | string,
+    decision?: EvaluatorDecision
+  ) => void;
 }
 
 interface EvaluatorGradeItem {
@@ -27,9 +31,11 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
   const [teamAnswers, setTeamAnswers] = useState<Record<string, string>>({});
   const [modelAnswers, setModelAnswers] = useState<Record<string, string>>({});
   const [grades, setGrades] = useState<Record<string, EvaluatorGradeItem>>({});
-  const [totalScore, setTotalScore] = useState<number | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  // Batch save state
+  const [isSavingAll, setIsSavingAll] = useState(false);
+  const [saveAllError, setSaveAllError] = useState<string | null>(null);
+  const [saveAllSuccess, setSaveAllSuccess] = useState<string | null>(null);
 
   // Check existing session status on initial mount
   useEffect(() => {
@@ -60,7 +66,6 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
               setTeamAnswers(data.answers || {});
               setModelAnswers(data.modelAnswers || {});
               setGrades(data.evaluatorGrades || {});
-              setTotalScore(typeof data.score === 'number' ? data.score : null);
             }
           }
         } catch (err) {
@@ -118,13 +123,43 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
     setGrades({});
   };
 
-  // Save grade decision for current question
-  const handleSelectDecision = async (decision: EvaluatorDecision) => {
+  // Select decision in local state without individual network calls
+  const handleSelectDecision = (decision: EvaluatorDecision) => {
     const q = questions[currentIdx];
     if (!q) return;
+    const points = decision === 'correct' ? 30 : decision === 'wrong' ? -20 : 0;
+    setGrades((prev) => ({
+      ...prev,
+      [q.id]: { decision, points },
+    }));
+    setSaveAllError(null);
+  };
 
-    setIsSaving(true);
-    setSaveStatus(null);
+  // Live computed total score from all 5 questions
+  const liveTotalScore = questions.reduce((sum, q) => {
+    const g = grades[q.id];
+    if (g?.decision === 'correct') return sum + 30;
+    if (g?.decision === 'wrong') return sum - 20;
+    return sum;
+  }, 0);
+
+  // Count of answered evaluations (correct or wrong)
+  const evaluatedCount = questions.filter(
+    (q) => grades[q.id]?.decision === 'correct' || grades[q.id]?.decision === 'wrong'
+  ).length;
+
+  // Single batch save: Save All Evaluations together
+  const handleSaveAllEvaluations = async () => {
+    if (isSavingAll) return; // Prevent duplicate submissions
+    setIsSavingAll(true);
+    setSaveAllError(null);
+    setSaveAllSuccess(null);
+
+    // Any question left unmarked gets 0 points ('ungraded')
+    const decisionsMap: Record<string, EvaluatorDecision> = {};
+    for (const q of questions) {
+      decisionsMap[q.id] = grades[q.id]?.decision ?? 'ungraded';
+    }
 
     try {
       const res = await fetch('/api/evaluator/grade', {
@@ -132,30 +167,33 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           teamName,
-          questionId: q.id,
-          decision,
+          decisions: decisionsMap,
         }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        setSaveStatus(data.error || 'Failed to save grade');
+        setSaveAllError(data.error || 'Failed to save evaluations');
+        setIsSavingAll(false);
         return;
       }
 
-      // Successfully updated on server
-      setGrades(data.evaluatorGrades || {});
-      setTotalScore(data.newScore);
-      setSaveStatus(`Saved: ${decision.toUpperCase()} (${decision === 'correct' ? '+30' : decision === 'wrong' ? '-20' : '0'} pts)`);
+      setSaveAllSuccess('✓ All evaluations saved! Returning to results…');
 
-      // Notify host page to refresh score badge/breakdown in real-time
+      // Update parent progress with new score and question decisions
       if (typeof data.newScore === 'number') {
-        onScoreUpdated?.(data.newScore, q.id, decision);
+        onScoreUpdated?.(data.newScore, decisionsMap);
       }
-    } catch {
-      setSaveStatus('Network error saving decision');
-    } finally {
-      setIsSaving(false);
+
+      // Automatically return to participant's submitted results page
+      setTimeout(() => {
+        setIsSavingAll(false);
+        setIsOpen(false);
+      }, 600);
+    } catch (err) {
+      console.error('Error saving all evaluations:', err);
+      setSaveAllError('Network error while saving evaluations');
+      setIsSavingAll(false);
     }
   };
 
@@ -163,11 +201,6 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
   const currentGrade = currentQ ? grades[currentQ.id]?.decision ?? 'ungraded' : 'ungraded';
   const participantAnswer = currentQ ? teamAnswers[currentQ.id] : undefined;
   const modelAnswer = currentQ ? modelAnswers[currentQ.id] : undefined;
-
-  // Count evaluated questions
-  const evaluatedCount = Object.values(grades).filter(
-    (g) => g && (g.decision === 'correct' || g.decision === 'wrong')
-  ).length;
 
   return (
     <>
@@ -250,16 +283,16 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
               </form>
             </div>
           ) : (
-            /* ── Two-Column Evaluator Panel ── */
+            /* ── Fast Manual Grading Evaluator Panel ── */
             <div
-              className="w-full max-w-5xl h-[92vh] max-h-[820px] rounded-2xl border border-amber-500/30 flex flex-col overflow-hidden text-zinc-100 motion-safe:animate-[modal-in_200ms_ease-out_both]"
+              className="w-full max-w-5xl h-[94vh] max-h-[850px] rounded-2xl border border-amber-500/30 flex flex-col overflow-hidden text-zinc-100 motion-safe:animate-[modal-in_200ms_ease-out_both]"
               style={{
                 backgroundColor: 'rgba(10, 10, 16, 0.95)',
                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.8), 0 0 30px rgba(245, 158, 11, 0.15)',
               }}
             >
               {/* Header Bar */}
-              <div className="px-5 py-3.5 border-b border-zinc-800 bg-zinc-950/80 flex items-center justify-between gap-4">
+              <div className="px-5 py-3.5 border-b border-zinc-800 bg-zinc-950/80 flex items-center justify-between gap-4 shrink-0">
                 <div className="flex items-center gap-3">
                   <span className="text-xl text-amber-400">⚖</span>
                   <div>
@@ -269,17 +302,17 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
                       <span className="text-zinc-300 font-normal">{teamName}</span>
                     </div>
                     <div className="font-mono text-[11px] text-zinc-400">
-                      Graded: {evaluatedCount} / {questions.length} questions · Total Score:{' '}
+                      Marked: {evaluatedCount} / {questions.length} questions · Live Total Score:{' '}
                       <span
                         className={`font-bold ${
-                          (totalScore ?? 0) > 0
+                          liveTotalScore > 0
                             ? 'text-emerald-400'
-                            : (totalScore ?? 0) < 0
+                            : liveTotalScore < 0
                             ? 'text-rose-400'
                             : 'text-zinc-300'
                         }`}
                       >
-                        {totalScore !== null ? `${totalScore > 0 ? `+${totalScore}` : totalScore} pts` : '0 pts'}
+                        {liveTotalScore > 0 ? `+${liveTotalScore}` : liveTotalScore} pts
                       </span>{' '}
                       / 150
                     </div>
@@ -305,7 +338,7 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
               </div>
 
               {/* Navigation Pills (Q1–Q5) */}
-              <div className="px-5 py-2.5 border-b border-zinc-800/80 bg-zinc-900/40 flex items-center gap-2 overflow-x-auto">
+              <div className="px-5 py-2.5 border-b border-zinc-800/80 bg-zinc-900/40 flex items-center gap-2 overflow-x-auto shrink-0">
                 {questions.map((q, idx) => {
                   const qGrade = grades[q.id]?.decision ?? 'ungraded';
                   const isCurrent = idx === currentIdx;
@@ -322,11 +355,11 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
                     >
                       <span>Q{idx + 1}</span>
                       {qGrade === 'correct' ? (
-                        <span className="text-emerald-400">✓ (+30)</span>
+                        <span className="text-emerald-400 font-black">✓ (+30)</span>
                       ) : qGrade === 'wrong' ? (
-                        <span className="text-rose-400">✗ (-20)</span>
+                        <span className="text-rose-400 font-black">✗ (-20)</span>
                       ) : (
-                        <span className="text-zinc-600">— (0)</span>
+                        <span className="text-zinc-500 font-normal">— (0)</span>
                       )}
                     </button>
                   );
@@ -334,7 +367,7 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
               </div>
 
               {/* Two-Column Body */}
-              <div className="flex-1 overflow-y-auto p-5 grid grid-cols-1 md:grid-cols-12 gap-5">
+              <div className="flex-1 overflow-y-auto p-5 grid grid-cols-1 md:grid-cols-12 gap-5 min-h-0">
                 {/* ── Left Column: Question, Participant Answer & Model Answer (8 cols) ── */}
                 <div className="md:col-span-8 flex flex-col gap-4 overflow-y-auto pr-1">
                   {/* Question Prompt */}
@@ -387,22 +420,22 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
                   </div>
                 </div>
 
-                {/* ── Right Column: Grading Decision Controls (4 cols) ── */}
+                {/* ── Right Column: Per-Question Choice Controls (4 cols) ── */}
                 <div className="md:col-span-4 flex flex-col justify-between rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
                   <div className="space-y-4">
                     <div>
                       <div className="font-mono text-[10px] tracking-widest uppercase text-zinc-400 mb-1">
-                        Grading Decision
+                        Select Choice
                       </div>
                       <div className="text-xs text-zinc-500 font-mono">
-                        Select evaluation outcome for Question {currentIdx + 1}:
+                        Choose grade for Question {currentIdx + 1}:
                       </div>
                     </div>
 
                     {/* Active Status Badge */}
                     <div className="p-3 rounded-xl border text-center font-mono">
                       <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">
-                        Active Grade
+                        Selected Choice
                       </div>
                       <div
                         className={`text-sm font-black uppercase tracking-wider ${
@@ -417,16 +450,15 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
                           ? '✓ CORRECT (+30 PTS)'
                           : currentGrade === 'wrong'
                           ? '✗ WRONG (-20 PTS)'
-                          : '— UNGRADED (0 PTS)'}
+                          : '— UNMARKED (0 PTS)'}
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
+                    {/* Choices (No individual save button) */}
                     <div className="space-y-2.5">
-                      {/* Correct (+30) */}
+                      {/* +30 Correct */}
                       <button
                         type="button"
-                        disabled={isSaving}
                         onClick={() => handleSelectDecision('correct')}
                         className={`w-full py-3.5 px-4 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer ${
                           currentGrade === 'correct'
@@ -440,10 +472,25 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
                         <span>+30 pts</span>
                       </button>
 
-                      {/* Wrong (-20) */}
+                      {/* 0 Unmarked / Skipped */}
                       <button
                         type="button"
-                        disabled={isSaving}
+                        onClick={() => handleSelectDecision('ungraded')}
+                        className={`w-full py-3 px-4 rounded-xl font-mono text-xs uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer ${
+                          currentGrade === 'ungraded'
+                            ? 'bg-zinc-800 text-amber-300 border-2 border-amber-400/80 font-bold shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                            : 'bg-zinc-950/60 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="text-sm">—</span> Unmarked / Skipped
+                        </span>
+                        <span>0 pts</span>
+                      </button>
+
+                      {/* -20 Wrong */}
+                      <button
+                        type="button"
                         onClick={() => handleSelectDecision('wrong')}
                         className={`w-full py-3.5 px-4 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer ${
                           currentGrade === 'wrong'
@@ -456,29 +503,7 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
                         </span>
                         <span>-20 pts</span>
                       </button>
-
-                      {/* Ungraded / Clear (0) */}
-                      <button
-                        type="button"
-                        disabled={isSaving}
-                        onClick={() => handleSelectDecision('ungraded')}
-                        className={`w-full py-2.5 px-4 rounded-xl font-mono text-xs uppercase tracking-wider flex items-center justify-between transition-all cursor-pointer ${
-                          currentGrade === 'ungraded'
-                            ? 'bg-zinc-800 text-zinc-200 border border-zinc-600'
-                            : 'bg-zinc-950/60 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-                        }`}
-                      >
-                        <span>Clear / Ungraded</span>
-                        <span>0 pts</span>
-                      </button>
                     </div>
-
-                    {/* Status feedback */}
-                    {saveStatus && (
-                      <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-xs text-center text-amber-300">
-                        {isSaving ? 'Saving decision…' : saveStatus}
-                      </div>
-                    )}
                   </div>
 
                   {/* Navigation controls (Prev / Next) */}
@@ -487,7 +512,7 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
                       type="button"
                       disabled={currentIdx === 0}
                       onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}
-                      className="flex-1 py-2 rounded-lg border border-zinc-800 bg-zinc-900/70 hover:bg-zinc-800 font-mono text-xs text-zinc-300 disabled:opacity-40 uppercase"
+                      className="flex-1 py-2 rounded-lg border border-zinc-800 bg-zinc-900/70 hover:bg-zinc-800 font-mono text-xs text-zinc-300 disabled:opacity-40 uppercase cursor-pointer"
                     >
                       ← Prev (Q{currentIdx})
                     </button>
@@ -495,11 +520,81 @@ export function EvaluatorMode({ teamName, questions, onScoreUpdated }: Evaluator
                       type="button"
                       disabled={currentIdx === questions.length - 1}
                       onClick={() => setCurrentIdx((i) => Math.min(questions.length - 1, i + 1))}
-                      className="flex-1 py-2 rounded-lg border border-zinc-800 bg-zinc-900/70 hover:bg-zinc-800 font-mono text-xs text-zinc-300 disabled:opacity-40 uppercase"
+                      className="flex-1 py-2 rounded-lg border border-zinc-800 bg-zinc-900/70 hover:bg-zinc-800 font-mono text-xs text-zinc-300 disabled:opacity-40 uppercase cursor-pointer"
                     >
                       Next (Q{currentIdx + 2}) →
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* ── Prominent Footer: SAVE ALL EVALUATIONS ── */}
+              <div className="p-4 sm:px-6 sm:py-4 border-t border-zinc-800 bg-zinc-950/95 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                <div className="text-center sm:text-left">
+                  <div className="font-mono text-xs text-zinc-300">
+                    <span>Evaluations: </span>
+                    <strong className="text-amber-400">{evaluatedCount} / {questions.length} marked</strong>
+                    <span className="mx-2 text-zinc-600">·</span>
+                    <span>Projected Score: </span>
+                    <span
+                      className={`font-mono font-black text-sm ${
+                        liveTotalScore > 0 ? 'text-emerald-400' : liveTotalScore < 0 ? 'text-rose-400' : 'text-zinc-300'
+                      }`}
+                    >
+                      {liveTotalScore > 0 ? `+${liveTotalScore}` : liveTotalScore} pts
+                    </span>
+                    <span className="text-zinc-500 text-[11px] ml-1">/ 150</span>
+                  </div>
+                  <div className="text-[11px] font-mono text-zinc-500 mt-0.5">
+                    Any question left unmarked receives 0 points.
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                  {saveAllError && (
+                    <span className="font-mono text-xs text-rose-400">
+                      ⚠ {saveAllError}
+                    </span>
+                  )}
+                  {saveAllSuccess && (
+                    <span className="font-mono text-xs text-emerald-400">
+                      {saveAllSuccess}
+                    </span>
+                  )}
+                  {/* Secondary Action: Return to player view (left of Save) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOpen(false);
+                      setIsAuthenticated(false);
+                      setPasscode('');
+                    }}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-lg border border-zinc-700/80 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 font-mono text-[11px] font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:border-zinc-500"
+                    title="Lock evaluator controls and return to player view"
+                  >
+                    <span className="text-xs">🔒</span>
+                    <span>Exit to Player View</span>
+                  </button>
+
+                  {/* Primary Action: Save All Evaluations */}
+                  <button
+                    type="button"
+                    disabled={isSavingAll}
+                    onClick={handleSaveAllEvaluations}
+                    className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-zinc-950 font-mono text-xs font-black uppercase tracking-wider shadow-[0_0_25px_rgba(16,185,129,0.35)] transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    {isSavingAll ? (
+                      <>
+                        <span className="animate-spin text-sm">⏳</span>
+                        <span>Saving All Evaluations…</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>💾</span>
+                        <span>SAVE ALL EVALUATIONS ({liveTotalScore > 0 ? `+${liveTotalScore}` : liveTotalScore} PTS)</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>

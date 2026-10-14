@@ -1,23 +1,13 @@
-import { correctQuestionScore } from '../../../../lib/server/db';
-
-/**
- * Organizer passphrase for score corrections.
- * In production this should come from an environment variable;
- * for the event this hardcoded value is acceptable.
- */
-const ORGANIZER_KEY = process.env.ORGANIZER_KEY || 'wikiclub-correct-2026';
+import { correctQuestionScore, saveAllEvaluatorGrades } from '../../../../lib/server/db';
+import { EvaluatorDecision } from '../../../../types/quiz';
 
 /**
  * POST /api/quiz/hard/correct
- * Body: { teamName, questionId, correctedPoints, organizerKey }
+ * Batch Body:  { teamName, organizerKey, decisions: { q1: 'correct', q2: 'wrong', ... } }
+ * Single Body: { teamName, questionId, correctedPoints, organizerKey }
  *
- * Allows authorized organisers to manually correct the points awarded for
- * a specific Hard quiz question. The correction is logged, the original
- * auto-evaluation is preserved for auditing, and the total score is
- * recalculated.
- *
- * Server-side authorization: the `organizerKey` must match the configured
- * passphrase. Requests without a valid key are rejected with 403.
+ * Allows authorized organisers to manually evaluate or correct points awarded for
+ * Hard quiz questions. Supports saving all evaluations in one batch operation.
  */
 export async function POST(request: Request) {
   let body: {
@@ -26,6 +16,7 @@ export async function POST(request: Request) {
     questionId?: unknown;
     correctedPoints?: unknown;
     organizerKey?: unknown;
+    decisions?: unknown;
   };
   try {
     body = await request.json();
@@ -33,7 +24,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { action, teamName, questionId, correctedPoints, organizerKey } = body;
+  const { action, teamName, questionId, correctedPoints, organizerKey, decisions } = body;
 
   // ── Authorization ──
   const validOrganizerKey = (
@@ -55,6 +46,24 @@ export async function POST(request: Request) {
   if (typeof teamName !== 'string' || !teamName.trim()) {
     return Response.json({ error: 'Missing teamName' }, { status: 400 });
   }
+
+  // Batch Save All Evaluations
+  if (decisions && typeof decisions === 'object') {
+    const rawDecisions = decisions as Record<string, unknown>;
+    const decisionsMap: Record<string, EvaluatorDecision> = {};
+    for (const [qid, val] of Object.entries(rawDecisions)) {
+      if (val === 'correct' || val === 30 || val === '30') decisionsMap[qid] = 'correct';
+      else if (val === 'wrong' || val === -20 || val === '-20') decisionsMap[qid] = 'wrong';
+      else decisionsMap[qid] = 'ungraded';
+    }
+    const result = await saveAllEvaluatorGrades(teamName, decisionsMap);
+    if (!result.success) {
+      return Response.json({ error: result.error || 'Failed to save evaluations' }, { status: 400 });
+    }
+    return Response.json({ ok: true, newScore: result.newScore, evaluatorGrades: result.evaluatorGrades });
+  }
+
+  // Single Question Correction (legacy fallback)
   if (typeof questionId !== 'string' || !questionId.trim()) {
     return Response.json({ error: 'Missing questionId' }, { status: 400 });
   }
