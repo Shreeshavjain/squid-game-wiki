@@ -36,7 +36,15 @@ export async function POST(request: Request) {
 
   const score = Object.values(results).reduce((sum, r) => sum + r.points, 0);
   const maxScore = questionIds.length * MEDIUM_SCORING.correct;
-  await recordSubmission(teamName, 'medium', submitted as Record<string, string>, { score, maxScore });
+  const saved = await recordSubmission(teamName, 'medium', submitted as Record<string, string>, {
+    score,
+    maxScore,
+    autoResults: results,
+  });
 
-  return Response.json({ score, maxScore, results });
+  return Response.json({
+    score: saved.score,
+    maxScore: saved.maxScore,
+    results: saved.autoResults ?? results,
+  });
 }

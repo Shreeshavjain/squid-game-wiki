@@ -6,7 +6,7 @@ import { LeaderboardEntry } from '../lib/server/db';
 import { ArenaBackground } from '../components/ArenaBackground';
 
 const STORAGE_KEY = 'squid_admin_passcode';
-const POLL_INTERVAL_MS = 4000;
+const POLL_INTERVAL_MS = 8000;
 
 export default function AdminPage() {
   const [passcode, setPasscode] = useState('');

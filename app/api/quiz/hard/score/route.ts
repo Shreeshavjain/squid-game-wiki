@@ -75,12 +75,17 @@ export async function POST(request: Request) {
     modelAnswers[id] = HARD_MODEL_ANSWERS[id] ?? '';
   }
 
-  await recordSubmission(teamName, 'hard', submitted as Record<string, string>, {
+  const saved = await recordSubmission(teamName, 'hard', submitted as Record<string, string>, {
     score,
     maxScore,
     autoResults: results,
     modelAnswers,
   });
 
-  return Response.json({ score, maxScore, results, modelAnswers });
+  return Response.json({
+    score: saved.score,
+    maxScore: saved.maxScore,
+    results: saved.autoResults ?? results,
+    modelAnswers: saved.modelAnswers ?? modelAnswers,
+  });
 }

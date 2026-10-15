@@ -60,14 +60,22 @@ const globalForMongo = globalThis as typeof globalThis & {
 function client(): Promise<MongoClient> {
   const uri = process.env.MONGODB_URI;
   if (!uri) throw new Error('MONGODB_URI is not set');
-  globalForMongo._mongoClient ??= new MongoClient(uri).connect();
+  globalForMongo._mongoClient ??= new MongoClient(uri, {
+    maxPoolSize: 10,
+    minPoolSize: 0,
+    maxIdleTimeMS: 30000,
+    serverSelectionTimeoutMS: 5000,
+  }).connect();
   return globalForMongo._mongoClient;
 }
 
 async function teams(): Promise<Collection<TeamRecord>> {
   const db = (await client()).db(process.env.MONGODB_DB || 'squidgame');
   const collection = db.collection<TeamRecord>('teams');
-  globalForMongo._teamsIndexed ??= collection.createIndex({ teamKey: 1 }, { unique: true });
+  globalForMongo._teamsIndexed ??= Promise.all([
+    collection.createIndex({ teamKey: 1 }, { unique: true }),
+    collection.createIndex({ score: -1, submittedAt: 1, enrolledAt: -1 }),
+  ]);
   await globalForMongo._teamsIndexed;
   return collection;
 }
@@ -98,14 +106,33 @@ export async function enrollTeam(teamName: string) {
 
 /** Records the team's difficulty. First lock wins — a later different choice is ignored. */
 export async function lockDifficulty(teamName: string, difficulty: DifficultyId) {
-  await enrollTeam(teamName);
-  await (await teams()).updateOne(
-    { teamKey: toTeamKey(teamName), difficulty: null },
+  const name = teamName.trim();
+  const key = toTeamKey(name);
+  const col = await teams();
+
+  // Ensure the team record exists via idempotent upsert
+  await enrollTeam(name);
+
+  // First lock wins: only updates if difficulty is currently null. Never throws duplicate key error.
+  await col.updateOne(
+    { teamKey: key, difficulty: null },
     { $set: { difficulty, lockedAt: new Date() } }
   );
 }
 
-/** Stores the final answers and, when auto-scored, the score. Only the first submission counts. */
+export interface SubmissionResponseData {
+  alreadySubmitted: boolean;
+  score: number;
+  maxScore: number;
+  autoResults?: Record<string, QuestionResult> | null;
+  modelAnswers?: Record<string, string> | null;
+}
+
+/**
+ * Stores the final answers and, when auto-scored, the score.
+ * Only the first submission counts. If a team submits again,
+ * returns the existing canonical score and results without overwriting.
+ */
 export async function recordSubmission(
   teamName: string,
   difficulty: DifficultyId,
@@ -116,25 +143,74 @@ export async function recordSubmission(
     autoResults?: Record<string, QuestionResult>;
     modelAnswers?: Record<string, string>;
   }
-) {
-  await lockDifficulty(teamName, difficulty);
-  const existing = await (await teams()).findOne({ teamKey: toTeamKey(teamName) });
-  await (await teams()).updateOne(
-    { teamKey: toTeamKey(teamName), difficulty, submittedAt: null },
+): Promise<SubmissionResponseData> {
+  const key = toTeamKey(teamName);
+  const col = await teams();
+
+  // Check if team already exists and if already submitted
+  const existing = await col.findOne({ teamKey: key });
+
+  if (existing && existing.submittedAt) {
+    // Already submitted — return existing canonical results (idempotent duplicate protection)
+    return {
+      alreadySubmitted: true,
+      score: existing.score ?? result?.score ?? 0,
+      maxScore: existing.maxScore ?? result?.maxScore ?? 0,
+      autoResults: existing.autoResults ?? result?.autoResults,
+      modelAnswers: existing.modelAnswers ?? result?.modelAnswers,
+    };
+  }
+
+  // Declare submission values
+  const finalScore = result?.score ?? null;
+  const finalMaxScore = result?.maxScore ?? null;
+  const finalAutoResults = result?.autoResults ?? null;
+  const finalModelAnswers = result?.modelAnswers ?? null;
+
+  // Ensure the team record exists in database
+  await enrollTeam(teamName);
+
+  // Atomic record submission: only matches if submittedAt is currently null.
+  // Note: upsert is false to prevent E11000 duplicate key error when two requests submit simultaneously.
+  const updateResult = await col.updateOne(
+    { teamKey: key, submittedAt: null },
     {
       $set: {
+        teamName: existing?.teamName ?? teamName.trim(),
+        difficulty: existing?.difficulty ?? difficulty,
+        lockedAt: existing?.lockedAt ?? new Date(),
         answers,
-        score: result?.score ?? null,
-        maxScore: result?.maxScore ?? null,
-        autoResults: result?.autoResults ?? null,
-        modelAnswers: result?.modelAnswers ?? null,
-        originalAutoResults: result?.autoResults ?? null,
+        score: finalScore,
+        maxScore: finalMaxScore,
+        autoResults: finalAutoResults,
+        modelAnswers: finalModelAnswers,
+        originalAutoResults: finalAutoResults,
         corrections: existing?.corrections || [],
         evaluatorGrades: existing?.evaluatorGrades || null,
         submittedAt: new Date(),
       },
     }
   );
+
+  // If another concurrent submission already won the race, fetch and return the winning canonical record
+  if (updateResult.matchedCount === 0) {
+    const winner = await col.findOne({ teamKey: key });
+    return {
+      alreadySubmitted: true,
+      score: winner?.score ?? finalScore ?? 0,
+      maxScore: winner?.maxScore ?? finalMaxScore ?? 0,
+      autoResults: winner?.autoResults ?? finalAutoResults,
+      modelAnswers: winner?.modelAnswers ?? finalModelAnswers,
+    };
+  }
+
+  return {
+    alreadySubmitted: false,
+    score: finalScore ?? 0,
+    maxScore: finalMaxScore ?? 0,
+    autoResults: finalAutoResults,
+    modelAnswers: finalModelAnswers,
+  };
 }
 
 /** Retrieves a team's submission results for the results page */
