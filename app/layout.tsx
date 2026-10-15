@@ -16,6 +16,13 @@ export const metadata: Metadata = {
   title: 'THE ARENA // Difficulty Selection Protocol',
   description:
     'Tactical difficulty selection dashboard for the university Squid Game tech-club event. Inspect protocols, review rules, and lock squad choices.',
+  icons: {
+    icon: [
+      { url: '/favicon.png', type: 'image/png' },
+    ],
+    shortcut: '/favicon.png',
+    apple: '/favicon.png',
+  },
 };
 
 export default function RootLayout({
