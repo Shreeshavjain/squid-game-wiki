@@ -29,7 +29,11 @@ export async function POST(request: Request) {
   const questionIds = Object.keys(MEDIUM_ANSWER_KEY);
   const results = Object.fromEntries(
     questionIds.map((id) => {
-      const correct = submitted[id] === MEDIUM_ANSWER_KEY[id];
+      const val = typeof submitted[id] === 'string' ? (submitted[id] as string).trim() : '';
+      if (!val) {
+        return [id, { correct: false, skipped: true, points: 0 }];
+      }
+      const correct = val === MEDIUM_ANSWER_KEY[id];
       return [id, { correct, points: correct ? MEDIUM_SCORING.correct : MEDIUM_SCORING.wrong }];
     })
   );

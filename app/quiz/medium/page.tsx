@@ -15,6 +15,7 @@ export default function MediumQuizPage() {
         quizTitle="Open Source & Tech Challenge"
         questions={MEDIUM_QUIZ}
         scoreEndpoint="/api/quiz/medium/score"
+        allowSkip
       />
     </Suspense>
   );
